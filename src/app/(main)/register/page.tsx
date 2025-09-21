@@ -3,7 +3,8 @@
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { supabase } from '@/lib/supabaseClient';
-import SuccessModal from '@/app/components/SuccessModal';
+import SuccessModal from '@/app/components/SuccessModal'; // Giả sử bạn đã có component này
+import Link from 'next/link'; // Import Link
 
 export default function RegisterPage() {
   const [email, setEmail] = useState('');
@@ -13,21 +14,26 @@ export default function RegisterPage() {
   const [error, setError] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [isSuccess, setIsSuccess] = useState(false);
-  const router = useRouter();
-
-  const handleSubmit = async (e: React.FormEvent) => {
+  const router=useRouter()
+const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError('');
 
-    if (password !== confirmPassword) {
-      setError('Mật khẩu không khớp.');
+    // --- CẢI TIẾN LOGIC VALIDATION ---
+    if (password.length < 6) {
+      setError('Mật khẩu phải có ít nhất 6 ký tự.');
       return;
     }
+    if (password !== confirmPassword) {
+      setError('Mật khẩu xác nhận không khớp.');
+      return;
+    }
+    // ------------------------------------
     
     setIsLoading(true);
 
     try {
-      const { error } = await supabase.auth.signUp({
+      const { data, error: signUpError } = await supabase.auth.signUp({
         email: email,
         password: password,
         options: {
@@ -37,14 +43,27 @@ export default function RegisterPage() {
         }
       });
 
-      if (error) throw error;
+      if (signUpError) throw signUpError;
       
-      setIsSuccess(true);
+      // --- CẢI TIẾN XỬ LÝ KẾT QUẢ ---
+      if (data.user && data.user.identities && data.user.identities.length === 0) {
+         // Trường hợp người dùng đã tồn tại nhưng chưa xác thực email
+         setError('Email này đã được đăng ký nhưng chưa được xác thực. Vui lòng kiểm tra lại hộp thư của bạn.');
+      } else {
+         // Đăng ký thành công
+         setIsSuccess(true);
+      }
+      // -------------------------------
 
     } catch (error: unknown) {
       let errorMessage = 'Đã có lỗi xảy ra. Vui lòng thử lại.';
       if (error instanceof Error) {
-        errorMessage = error.message;
+        // Cải thiện thông báo lỗi từ Supabase
+        if (error.message.includes('User already registered')) {
+            errorMessage = 'Email này đã tồn tại. Vui lòng chọn email khác hoặc đăng nhập.';
+        } else {
+            errorMessage = error.message;
+        }
       }
       setError(errorMessage);
       console.error("Supabase registration error:", error);
@@ -59,9 +78,13 @@ export default function RegisterPage() {
         isOpen={isSuccess}
         onClose={() => router.push('/login')}
         title="Đăng ký thành công!"
-        message="Vui lòng kiểm tra email của bạn để xác thực tài khoản trước khi đăng nhập."
+        message="Chúng tôi đã gửi một email xác thực. Vui lòng kiểm tra hộp thư của bạn để hoàn tất đăng ký."
         buttonText="Đi đến trang Đăng nhập"
       />
+
+
+
+
 
       <main className="relative flex items-center justify-center min-h-screen bg-gradient-to-br from-gray-900 via-purple-900 to-gray-900 text-white font-sans overflow-hidden">
         <div className="w-full max-w-6xl mx-auto px-4">

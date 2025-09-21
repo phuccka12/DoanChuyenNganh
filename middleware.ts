@@ -12,11 +12,8 @@ export async function middleware(req: NextRequest) {
   } = await supabase.auth.getSession();
 
   const { pathname } = req.nextUrl;
-  
-  // LOG 1: Middleware đã chạy cho đường dẫn nào
-  console.log(`--- Middleware đang chạy cho: ${pathname}`);
 
-  // Nếu chưa đăng nhập thì không cần làm gì thêm
+  // Xử lý người dùng chưa đăng nhập
   if (!session) {
     if (pathname.startsWith('/dashboard') || pathname.startsWith('/admin')) {
       return NextResponse.redirect(new URL('/login', req.url));
@@ -24,40 +21,39 @@ export async function middleware(req: NextRequest) {
     return res;
   }
 
-  // LOG 2: Đã tìm thấy session của user nào
-  console.log(`>>> Đã tìm thấy session cho User ID: ${session.user.id}`);
-  
-  // Lấy vai trò của người dùng từ DB
-  const { data: profile, error } = await supabase
+  // Xử lý người dùng đã đăng nhập
+  const { data: profile } = await supabase
     .from('profiles')
     .select('role')
     .eq('id', session.user.id)
     .single();
 
-  // LOG 3: Kiểm tra lỗi từ Supabase
-  if (error) {
-    console.error(`!!! Lỗi khi truy vấn DB: ${error.message}`);
-  }
-
   const userRole = profile?.role;
-  // LOG 4 (QUAN TRỌNG NHẤT): Vai trò đọc được là gì?
-  console.log(`>>> Vai trò của người dùng trong DB là: >>> ${userRole} <<<`);
 
-  // Xử lý chuyển hướng dựa trên vai trò
-  if (userRole === 'admin' && pathname.startsWith('/dashboard')) {
-    console.log('>>> Quyết định: Là admin ở dashboard, chuyển về /admin.');
+  // *** LOGIC SỬA LỖI NẰM Ở ĐÂY ***
+  // Nếu là admin và đang không ở trong khu vực admin, BẮT BUỘC chuyển về /admin.
+  if (userRole === 'admin' && !pathname.startsWith('/admin')) {
     return NextResponse.redirect(new URL('/admin', req.url));
   }
 
+  // Nếu là user thường mà cố vào khu vực admin, BẮT BUỘC chuyển về /dashboard.
   if (userRole !== 'admin' && pathname.startsWith('/admin')) {
-    console.log('>>> Quyết định: Không phải admin nhưng vào /admin, chuyển về /dashboard.');
     return NextResponse.redirect(new URL('/dashboard', req.url));
   }
 
-  console.log('--- Middleware kết thúc, cho phép truy cập.');
   return res;
 }
 
 export const config = {
-  matcher: ['/((?!api|_next/static|_next/image|favicon.ico).*)'],
+  matcher: [
+    /*
+     * Match all request paths except for the ones starting with:
+     * - api (API routes)
+     * - _next/static (static files)
+     * - _next/image (image optimization files)
+     * - favicon.ico (favicon file)
+     * This ensures middleware runs on all pages but not on static assets.
+     */
+    '/((?!api|_next/static|_next/image|favicon.ico).*)',
+  ],
 };

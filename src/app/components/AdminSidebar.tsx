@@ -1,28 +1,35 @@
+// src/components/AdminSidebar.tsx
 'use client';
 
+import { useState, useRef, createContext, useContext } from "react";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
-import { useState, useContext, createContext } from "react";
-import { supabase } from "@/lib/supabaseClient";
-import { useUser } from "@/app/context/UserContext";
+import { useUser } from "@/app/context/UserContext"; // chỉnh đường dẫn nếu khác
+import { supabase } from "@/lib/supabaseClient"; // chỉnh đường dẫn nếu khác
+
+// Icon
 import {
   LayoutDashboard,
   Users,
-  GraduationCap,
-  BookOpen,
-  BarChart3,
+  Layers3,
+  FileText,
+  BarChart,
   Settings,
   LogOut,
   ChevronFirst,
   ChevronLast,
+  User as UserIcon,
 } from "lucide-react";
 
+// Context để quản lý trạng thái sidebar
 const SidebarContext = createContext({ isCollapsed: false });
 
 export default function AdminSidebar() {
   const [isCollapsed, setIsCollapsed] = useState(false);
   const { profile } = useUser();
   const router = useRouter();
+  const [isMenuOpen, setIsMenuOpen] = useState(false);
+  const menuRef = useRef<HTMLDivElement>(null);
 
   const handleSignOut = async () => {
     await supabase.auth.signOut();
@@ -31,19 +38,21 @@ export default function AdminSidebar() {
 
   return (
     <aside className="h-screen sticky top-0">
-      <nav className="h-full flex flex-col bg-indigo-500 border-r shadow-sm">
-        {/* Header */}
+      <nav className="h-full flex flex-col bg-sky-500 border-r shadow-sm">
+        {/* Logo + Toggle */}
         <div className="p-4 pb-2 flex justify-between items-center">
           <h1
             className={`overflow-hidden transition-all ${
-              isCollapsed ? "w-0" : "w-45"
-            } text-2xl font-bold text-white`}
+              isCollapsed ? "w-0" : "w-60"
+            } text-xl font-semibold`}
           >
-            Admin Panel
+            <span>TRANG</span>
+            <span></span>
+            <span className="text-neutral-900">ADMIN</span>
           </h1>
           <button
-            onClick={() => setIsCollapsed((c) => !c)}
-            className="p-1.5 rounded-lg bg-indigo-600 hover:bg-indigo-400"
+            onClick={() => setIsCollapsed((curr) => !curr)}
+            className="p-1.5 rounded-lg bg-gray-500 hover:bg-gray-100"
           >
             {isCollapsed ? <ChevronLast /> : <ChevronFirst />}
           </button>
@@ -53,48 +62,95 @@ export default function AdminSidebar() {
         <SidebarContext.Provider value={{ isCollapsed }}>
           <ul className="flex-1 px-3">
             <SidebarItem
-              icon={<LayoutDashboard size={30} />}
-              text="Bảng điều khiển"
-              href="/admin/dashboard"
+              icon={<LayoutDashboard size={35} />}
+              text={<span className="text-black text-lg">Bảng điều khiển</span>}
+              href="/admin"
             />
             <SidebarItem
-              icon={<Users size={30} />}
-              text="Quản lý người dùng"
+              icon={<Users size={35} />}
+              text={<span className="text-black text-lg">Người dùng</span>}
               href="/admin/users"
             />
             <SidebarItem
-              icon={<GraduationCap size={30} />}
-              text="Quản lý lớp học"
+              icon={<Layers3 size={35} />}
+              text={<span className="text-black text-lg">Lớp học</span>}
               href="/admin/classes"
             />
             <SidebarItem
-              icon={<BookOpen size={30} />}
-              text="Quản lý đề thi"
+              icon={<FileText size={35} />}
+              text={<span className="text-black text-lg">Đề thi</span>}
               href="/admin/exams"
             />
             <SidebarItem
-              icon={<BarChart3 size={30} />}
-              text="Thống kê hệ thống"
-              href="/admin/statistics"
+              icon={<BarChart size={35} />}
+              text={<span className="text-black text-lg">Báo cáo</span>}
+              href="/admin/reports"
             />
             <hr className="my-3" />
             <SidebarItem
-              icon={<Settings size={30} />}
-              text="Cài đặt"
+              icon={<Settings size={35} />}
+              text={<span className="text-black text-lg">Cài đặt</span>}
               href="/admin/settings"
             />
           </ul>
         </SidebarContext.Provider>
 
-        {/* Footer */}
-        <div className="border-t p-3">
-          <button
-            onClick={handleSignOut}
-            className="w-full text-left flex items-center px-3 py-2 text-white hover:bg-red-400 rounded-md"
+        {/* User info + dropdown */}
+        <div className="border-t p-3 relative">
+          {isMenuOpen && (
+            <div
+              ref={menuRef}
+              className="absolute bottom-full mb-2 w-full bg-white border rounded-md shadow-lg"
+            >
+              <ul className="py-1">
+                <li>
+                  <Link
+                    href="/admin/profile"
+                    className="flex items-center px-3 py-2 text-black text-lg hover:bg-gray-100"
+                  >
+                    <UserIcon size={18} className="mr-2" />
+                    Trang cá nhân
+                  </Link>
+                </li>
+                <li>
+                  <button
+                    onClick={handleSignOut}
+                    className="w-full text-left flex items-center px-3 py-2 text-black text-lg hover:bg-red-400"
+                  >
+                    <LogOut size={18} className="mr-2" />
+                    Đăng xuất
+                  </button>
+                </li>
+              </ul>
+            </div>
+          )}
+
+          <div
+            onClick={() => setIsMenuOpen((curr) => !curr)}
+            className="flex items-center cursor-pointer"
           >
-            <LogOut size={20} className="mr-2" />
-            Đăng xuất
-          </button>
+            <img
+              src={`https://ui-avatars.com/api/?name=${
+                profile?.full_name || "A"
+              }&background=0284c7&color=fff`}
+              alt="Admin Avatar"
+              className="w-10 h-10 rounded-md"
+            />
+            <div
+              className={`flex justify-between items-center overflow-hidden transition-all ${
+                isCollapsed ? "w-0" : "w-52 ml-3"
+              }`}
+            >
+              <div className="leading-4">
+                <h4 className="font-semibold">
+                  {profile?.full_name || "Admin"}
+                </h4>
+                <span className="text-xs text-gray-600">
+                  {profile?.role || "admin"}
+                </span>
+              </div>
+            </div>
+          </div>
         </div>
       </nav>
     </aside>
@@ -107,7 +163,7 @@ function SidebarItem({
   href,
 }: {
   icon: React.ReactNode;
-  text: string;
+  text: React.ReactNode;
   href: string;
 }) {
   const { isCollapsed } = useContext(SidebarContext);
@@ -119,14 +175,14 @@ function SidebarItem({
       <li
         className={`relative flex items-center py-2 px-3 my-1 font-medium rounded-md cursor-pointer transition-colors group ${
           isActive
-            ? "bg-indigo-700 text-white"
-            : "hover:bg-indigo-400 text-white"
+            ? "bg-gradient-to-tr from-cyan-50 to-orange-100 text-pink-800"
+            : "hover:bg-gray-50 text-gray-600"
         }`}
       >
         {icon}
         <span
           className={`overflow-hidden transition-all ${
-            isCollapsed ? "w-0" : "w-40 ml-3"
+            isCollapsed ? "w-0" : "w-52 ml-3"
           }`}
         >
           {text}

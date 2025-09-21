@@ -37,7 +37,7 @@ export default function RootLayout({
             // KỊCH BẢN 1: Nếu là trang admin, hiển thị giao diện admin
             <div className="min-h-screen bg-gray-900 text-white">
               {/* Bạn có thể thêm Header riêng cho Admin ở đây nếu muốn */}
-              <main className="p-8">{children}</main>
+              <main className="">{children}</main>
             </div>
           ) : isDashboardRoute ? (
             // KỊCH BẢN 2: Nếu là trang dashboard, hiển thị Sidebar

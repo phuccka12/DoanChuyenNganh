@@ -5,7 +5,6 @@ import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { supabase } from '../../../lib/supabaseClient';
 import { useUser } from '../../context/UserContext';
-import DashboardSidebar from '../../components/DashboardSidebar'
 
 export default function OnboardingPage() {
     const router = useRouter();
@@ -59,7 +58,7 @@ export default function OnboardingPage() {
 
     return (
         <>
-            <DashboardSidebar />
+        
             <div className="min-h-screen bg-gray-900 text-white flex items-center justify-center p-4 pt-20">
                 <div className="w-full max-w-2xl">
                     <div className="text-center mb-10">

@@ -36,7 +36,7 @@ export default function DashboardSidebar() {
 
     return (
         <aside className="h-screen sticky top-0">
-            <nav className="h-full flex flex-col bg-sky-400 border-r shadow-sm">
+            <nav className="h-full flex flex-col bg-sky-600 border-r shadow-sm">
                 <div className="p-4 pb-2 flex justify-between items-center">
                    <h1 className={`overflow-hidden transition-all ${isCollapsed ? "w-0" : "w-45"} text-3xl font-semibold`}>
     <span>HIDAY</span>
