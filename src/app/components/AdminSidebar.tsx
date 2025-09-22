@@ -6,7 +6,6 @@ import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { useUser } from "@/app/context/UserContext"; // chỉnh đường dẫn nếu khác
 import { supabase } from "@/lib/supabaseClient"; // chỉnh đường dẫn nếu khác
-
 // Icon
 import {
   LayoutDashboard,
@@ -19,6 +18,7 @@ import {
   ChevronFirst,
   ChevronLast,
   User as UserIcon,
+  GitMerge 
 } from "lucide-react";
 
 // Context để quản lý trạng thái sidebar
@@ -44,11 +44,10 @@ export default function AdminSidebar() {
           <h1
             className={`overflow-hidden transition-all ${
               isCollapsed ? "w-0" : "w-60"
-            } text-xl font-semibold`}
+            } text-3xl font-semibold`}
           >
-            <span>TRANG</span>
-            <span></span>
-            <span className="text-neutral-900">ADMIN</span>
+            <span>Admin</span>
+            <span className="text-neutral-900">Panel</span>
           </h1>
           <button
             onClick={() => setIsCollapsed((curr) => !curr)}
@@ -70,6 +69,11 @@ export default function AdminSidebar() {
               icon={<Users size={35} />}
               text={<span className="text-black text-lg">Người dùng</span>}
               href="/admin/users"
+            />
+             <SidebarItem
+              icon={<GitMerge size={35} />}
+              text={<span className="text-black text-lg">Lộ trình học </span>}
+              href="/admin/learning-paths"
             />
             <SidebarItem
               icon={<Layers3 size={35} />}
