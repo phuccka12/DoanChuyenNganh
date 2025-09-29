@@ -31,7 +31,7 @@ async function getPathData(pathId: string) {
     .eq('path_id', pathId)
     .order('item_order');
 
-  const pathItems = (pathItemsData as any[] || []) as PathItemWithLesson[];
+  const pathItems = (pathItemsData as PathItemWithLesson[] || []);
 
   const lessonIdsInPath = pathItems
     .map(item => item.lessons?.[0]?.id)

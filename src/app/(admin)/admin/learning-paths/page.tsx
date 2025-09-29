@@ -60,7 +60,14 @@ export default async function ManageLearningPathsPage() {
                     key={path.id}
                     className="border-b border-gray-100 hover:bg-gray-50 transition"
                   >
-                    <td className="px-6 py-4 font-medium text-gray-900">{path.name}</td>
+                   <td className="px-6 py-4 font-medium text-gray-900">
+                    <Link 
+                      href={`/admin/learning-paths/${path.id}`} 
+                    className="hover:underline"
+                                              >
+                                  {path.name}
+                                    </Link>
+</td>
                     <td className="px-6 py-4">
                       <span className="inline-block px-2 py-1 text-xs font-medium rounded-full bg-indigo-100 text-indigo-700">
                         {path.min_score} – {path.max_score}
