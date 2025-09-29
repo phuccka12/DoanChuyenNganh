@@ -2,7 +2,7 @@
 import { createServerComponentClient } from '@supabase/auth-helpers-nextjs';
 import { cookies } from 'next/headers';
 import Link from 'next/link';
-import { PlusCircle, BookCopy, Trash2 } from 'lucide-react';
+import { PlusCircle, BookCopy, Trash2,  FilePenLine } from 'lucide-react';
 import type { Database } from '@/lib/database.types';
 import { deleteLesson } from './actions';
 
@@ -58,13 +58,25 @@ export default async function ManageLessonsPage() {
                       </span>
                     </td>
                     <td className="px-6 py-4 text-right flex justify-end gap-2">
-                      {/* TODO: Add Edit Link */}
-                      <form action={deleteLesson}>
-                        <input type="hidden" name="lessonId" value={lesson.id} />
-                        <button type="submit" className="text-red-500 hover:text-red-700 p-2 rounded-md hover:bg-red-50">
-                          <Trash2 size={18} />
-                        </button>
-                      </form>
+                      <td className="px-6 py-4 text-right flex justify-end items-center gap-2">
+  {/* Link Chỉnh sửa */}
+  <Link
+    href={`/admin/lessons/${lesson.id}/edit`}
+    className="text-blue-600 hover:text-blue-800 p-2 rounded-md hover:bg-blue-50 transition-colors"
+    title="Chỉnh sửa"
+  >
+    <FilePenLine size={18} />
+  </Link>
+
+  {/* Form Xóa */}
+  <form action={deleteLesson}>
+    <input type="hidden" name="lessonId" value={lesson.id} />
+    <button type="submit" className="text-red-500 hover:text-red-700 p-2 rounded-md hover:bg-red-50 transition-colors" title="Xóa">
+      <Trash2 size={18} />
+    </button>
+  </form>
+</td>
+                     
                     </td>
                   </tr>
                 ))
