@@ -78,8 +78,8 @@ export default function AdminSidebar() {
             />
             <SidebarItem
               icon={<Layers3 size={35} />}
-              text={<span className="text-black text-lg">Lớp học</span>}
-              href="/admin/classes"
+              text={<span className="text-black text-lg">Bài Học </span>}
+              href="/admin/lessons"
             />
             <SidebarItem
               icon={<FileText size={35} />}
