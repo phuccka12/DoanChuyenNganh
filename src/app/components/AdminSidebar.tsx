@@ -5,7 +5,7 @@ import { useState, useRef, createContext, useContext } from "react";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { useUser } from "@/app/context/UserContext"; // chỉnh đường dẫn nếu khác
-import { supabase } from "@/lib/supabaseClient"; // chỉnh đường dẫn nếu khác
+import { createClientComponentClient } from '@supabase/auth-helpers-nextjs';
 // Icon
 import {
   LayoutDashboard,
@@ -30,6 +30,7 @@ export default function AdminSidebar() {
   const router = useRouter();
   const [isMenuOpen, setIsMenuOpen] = useState(false);
   const menuRef = useRef<HTMLDivElement>(null);
+  const supabase = createClientComponentClient();
 
   const handleSignOut = async () => {
     await supabase.auth.signOut();
@@ -62,7 +63,7 @@ export default function AdminSidebar() {
           <ul className="flex-1 px-3">
             <SidebarItem
               icon={<LayoutDashboard size={35} />}
-              text={<span className="text-black text-lg">Bảng điều khiển</span>}
+              text={<span className="text-black text-lg">Dashboard</span>}
               href="/admin"
             />
             <SidebarItem

@@ -3,7 +3,7 @@
 
 import { createContext, useContext, useState, useEffect } from 'react';
 import { useRouter, usePathname } from 'next/navigation';
-import { supabase } from '../../lib/supabaseClient';
+import { createClientComponentClient } from '@supabase/auth-helpers-nextjs';
 import type { User } from '@supabase/supabase-js';
 
 // Cập nhật: Thêm các trường mới vào Profile
@@ -28,6 +28,7 @@ export function UserProvider({ children }: { children: React.ReactNode }) {
   const [isLoading, setIsLoading] = useState(true);
   const router = useRouter();
   const pathname = usePathname();
+  const supabase = createClientComponentClient();
 
   useEffect(() => {
     const fetchUserData = async (currentUser: User | null) => {
@@ -69,7 +70,7 @@ export function UserProvider({ children }: { children: React.ReactNode }) {
     return () => {
       authListener.subscription.unsubscribe();
     };
-  }, [router, pathname]);
+  }, [router, pathname, supabase]);
 
   const value = { user, profile, isLoading };
   return <UserContext.Provider value={value}>{children}</UserContext.Provider>;

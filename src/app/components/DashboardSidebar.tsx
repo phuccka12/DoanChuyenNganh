@@ -5,7 +5,7 @@ import { useState, createContext, useRef, useContext } from 'react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { useUser } from '../../app/context/UserContext'; // Sửa đường dẫn nếu cần
-import { supabase } from '../../lib/supabaseClient'; // Sửa đường dẫn nếu cần
+import { createClientComponentClient } from '@supabase/auth-helpers-nextjs';
 import { useRouter } from 'next/navigation';
 
 // Import icons từ Lucide React
@@ -27,8 +27,10 @@ export default function DashboardSidebar() {
     const [isCollapsed, setIsCollapsed] = useState(false);
     const { profile } = useUser();
     const router = useRouter();
-  const [isMenuOpen, setIsMenuOpen] = useState(false); // <-- State cho menu dropdown 
-   const menuRef = useRef<HTMLDivElement>(null); // <-- Ref để theo dõi menu dropdown
+    const [isMenuOpen, setIsMenuOpen] = useState(false); // <-- State cho menu dropdown 
+    const menuRef = useRef<HTMLDivElement>(null); // <-- Ref để theo dõi menu dropdown
+    const supabase = createClientComponentClient();
+    
     const handleSignOut = async () => {
         await supabase.auth.signOut();
         router.push('/login');
@@ -51,7 +53,7 @@ export default function DashboardSidebar() {
     <ul className="flex-1 px-3">
         <SidebarItem 
             icon={<LayoutDashboard  size={35} />} 
-            text={<span className="text-black text-lg">Bảng điều khiển</span>} 
+            text={<span className="text-black text-lg">Dashboard</span>} 
             href="/dashboard" 
         />
         <SidebarItem 
