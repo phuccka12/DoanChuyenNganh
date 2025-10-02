@@ -82,68 +82,8 @@ CREATE INDEX IF NOT EXISTS idx_user_progress_user ON user_progress(user_id);
 CREATE INDEX IF NOT EXISTS idx_user_progress_path ON user_progress(learning_path_id);
 CREATE INDEX IF NOT EXISTS idx_user_learning_paths_user ON user_learning_paths(user_id);
 
--- 7. Thêm dữ liệu mẫu cho TOEIC
-INSERT INTO learning_paths (name, description, course_type, level, target_score, duration_weeks, difficulty_level) VALUES
-('TOEIC Beginner Complete', 'Lộ trình TOEIC dành cho người mới bắt đầu, mục tiêu 450+ điểm', 'TOEIC', 'Beginner', 450, 12, 2),
-('TOEIC Intermediate Plus', 'Lộ trình TOEIC trung cấp, mục tiêu 650+ điểm', 'TOEIC', 'Intermediate', 650, 16, 3),
-('TOEIC Advanced Mastery', 'Lộ trình TOEIC nâng cao, mục tiêu 850+ điểm', 'TOEIC', 'Advanced', 850, 20, 4);
-
--- 8. Thêm dữ liệu mẫu cho IELTS  
-INSERT INTO learning_paths (name, description, course_type, level, target_score, duration_weeks, difficulty_level) VALUES
-('IELTS Foundation 5.5', 'Lộ trình IELTS cơ bản, mục tiêu band 5.5', 'IELTS', 'Elementary', 55, 14, 2),
-('IELTS Academic 6.5', 'Lộ trình IELTS học thuật, mục tiêu band 6.5', 'IELTS', 'Intermediate', 65, 18, 3),
-('IELTS Professional 7.5+', 'Lộ trình IELTS chuyên nghiệp, mục tiêu band 7.5+', 'IELTS', 'Advanced', 75, 24, 4);
-
--- 9. Thêm dữ liệu mẫu cho APTIS
-INSERT INTO learning_paths (name, description, course_type, level, target_score, duration_weeks, difficulty_level) VALUES
-('APTIS General B1', 'Lộ trình APTIS General, mục tiêu B1', 'APTIS', 'Intermediate', 3, 12, 2),
-('APTIS Academic B2', 'Lộ trình APTIS Academic, mục tiêu B2', 'APTIS', 'Upper-Intermediate', 4, 16, 3),
-('APTIS Professional C1', 'Lộ trình APTIS chuyên nghiệp, mục tiêu C1', 'APTIS', 'Advanced', 5, 20, 4);
-
--- 10. Thêm curriculum mẫu cho TOEIC Beginner
-DO $$
-DECLARE
-    path_id UUID;
-    week_num INTEGER;
-    day_num INTEGER;
-BEGIN
-    SELECT id INTO path_id FROM learning_paths WHERE name = 'TOEIC Beginner Complete' LIMIT 1;
-    
-    FOR week_num IN 1..4 LOOP
-        FOR day_num IN 1..5 LOOP -- Học 5 ngày/tuần
-            INSERT INTO curriculum_items (
-                learning_path_id, week_number, day_number, title, description, 
-                content_type, estimated_minutes, order_index
-            ) VALUES (
-                path_id, 
-                week_num, 
-                day_num,
-                CASE day_num
-                    WHEN 1 THEN 'Listening Part 1 - Photos'
-                    WHEN 2 THEN 'Reading Part 5 - Grammar'  
-                    WHEN 3 THEN 'Listening Part 2 - Questions'
-                    WHEN 4 THEN 'Reading Part 6 - Text Completion'
-                    WHEN 5 THEN 'Practice Test - Week ' || week_num
-                END,
-                CASE day_num
-                    WHEN 1 THEN 'Học cách mô tả hình ảnh trong TOEIC Part 1'
-                    WHEN 2 THEN 'Ôn tập ngữ pháp cơ bản cho TOEIC Part 5'
-                    WHEN 3 THEN 'Luyện nghe câu hỏi trả lời ngắn Part 2'
-                    WHEN 4 THEN 'Điền từ vào đoạn văn Part 6'
-                    WHEN 5 THEN 'Kiểm tra kiến thức tuần ' || week_num
-                END,
-                CASE day_num
-                    WHEN 5 THEN 'Test'
-                    WHEN 1 THEN 'Listening'
-                    WHEN 3 THEN 'Listening'
-                    ELSE 'Reading'
-                END,
-                CASE day_num WHEN 5 THEN 90 ELSE 45 END,
-                (week_num - 1) * 5 + day_num
-            );
-        END LOOP;
-    END LOOP;
-END $$;
+-- 7. Dữ liệu mẫu đã được bỏ - Admin sẽ tự tạo lộ trình học thông qua giao diện
+-- Các lộ trình học sẽ được tạo bởi admin thay vì sử dụng dữ liệu mẫu cứng
 
 -- 11. Functions để tính toán tiến độ
 CREATE OR REPLACE FUNCTION calculate_user_path_progress(p_user_id UUID, p_learning_path_id UUID)

@@ -21,13 +21,40 @@ type LearningPath = Database['public']['Tables']['learning_paths']['Row'];
 type CurriculumItem = Database['public']['Tables']['curriculum_items']['Row'];
 type UserLearningPath = Database['public']['Tables']['user_learning_paths']['Row'];
 
-interface PathWithProgress extends LearningPath {
+interface PathWithRelations extends LearningPath {
+  curriculum_items?: { id: string }[];
+  user_learning_paths?: { id: string; user_id: string; overall_progress: number | null }[];
+}
+
+interface PathWithProgress {
+  id: string;
+  name: string;
+  description: string | null;
+  course_type: string;
+  level: string;
+  target_score: number | null;
+  duration_weeks: number | null;
+  difficulty_level: number | null;
+  prerequisites: string | null;
+  is_active: boolean;
+  created_at: string;
   curriculum_count: number;
   enrolled_users: number;
   avg_completion: number;
 }
 
-interface DetailedPath extends LearningPath {
+interface DetailedPath {
+  id: string;
+  name: string;
+  description: string | null;
+  course_type: string;
+  level: string;
+  target_score: number | null;
+  duration_weeks: number | null;
+  difficulty_level: number | null;
+  prerequisites: string | null;
+  is_active: boolean;
+  created_at: string;
   curriculum_items: CurriculumItem[];
   user_progress?: UserLearningPath;
 }
@@ -53,7 +80,12 @@ export default function LearningPathPage() {
           .from('learning_paths')
           .select(`
             *,
-            curriculum_items!inner(id)
+            curriculum_items(id),
+            user_learning_paths(
+              id,
+              user_id,
+              overall_progress
+            )
           `)
           .eq('is_active', true)
           .order('course_type')
@@ -61,13 +93,22 @@ export default function LearningPathPage() {
 
         if (pathsError) throw pathsError;
 
-        // Process data to include counts
-        const pathsWithStats: PathWithProgress[] = pathsData.map(path => ({
-          ...path,
-          curriculum_count: path.curriculum_items?.length || 0,
-          enrolled_users: Math.floor(Math.random() * 50) + 10, // Mock data
-          avg_completion: Math.floor(Math.random() * 40) + 60 // Mock data
-        }));
+        // Process data to include real counts and statistics
+        const pathsWithStats: PathWithProgress[] = (pathsData as PathWithRelations[]).map(path => {
+          const enrolledUsers = path.user_learning_paths?.length || 0;
+          const avgCompletion = enrolledUsers > 0 && path.user_learning_paths
+            ? Math.round(
+                path.user_learning_paths.reduce((acc: number, ulp) => acc + (ulp.overall_progress || 0), 0) / enrolledUsers
+              ) 
+            : 0;
+
+          return {
+            ...path,
+            curriculum_count: path.curriculum_items?.length || 0,
+            enrolled_users: enrolledUsers,
+            avg_completion: avgCompletion
+          } as PathWithProgress;
+        });
 
         setPaths(pathsWithStats);
       } catch (err) {
@@ -89,7 +130,12 @@ export default function LearningPathPage() {
         .from('learning_paths')
         .select(`
           *,
-          curriculum_items!inner(id)
+          curriculum_items(id),
+          user_learning_paths(
+            id,
+            user_id,
+            overall_progress
+          )
         `)
         .eq('is_active', true)
         .order('course_type')
@@ -97,13 +143,22 @@ export default function LearningPathPage() {
 
       if (pathsError) throw pathsError;
 
-      // Process data to include counts
-      const pathsWithStats: PathWithProgress[] = pathsData.map(path => ({
-        ...path,
-        curriculum_count: path.curriculum_items?.length || 0,
-        enrolled_users: Math.floor(Math.random() * 50) + 10, // Mock data
-        avg_completion: Math.floor(Math.random() * 40) + 60 // Mock data
-      }));
+      // Process data to include real counts and statistics
+      const pathsWithStats: PathWithProgress[] = (pathsData as PathWithRelations[]).map(path => {
+        const enrolledUsers = path.user_learning_paths?.length || 0;
+        const avgCompletion = enrolledUsers > 0 && path.user_learning_paths
+          ? Math.round(
+              path.user_learning_paths.reduce((acc: number, ulp) => acc + (ulp.overall_progress || 0), 0) / enrolledUsers
+            ) 
+          : 0;
+
+        return {
+          ...path,
+          curriculum_count: path.curriculum_items?.length || 0,
+          enrolled_users: enrolledUsers,
+          avg_completion: avgCompletion
+        } as PathWithProgress;
+      });
 
       setPaths(pathsWithStats);
     } catch (err) {
@@ -569,8 +624,8 @@ function PathCurriculum({ curriculum }: { curriculum: CurriculumItem[] }) {
           </h4>
           
           <div className="space-y-2">
-            {items
-              .sort((a, b) => a.order_index - b.order_index)
+            {(items as CurriculumItem[])
+              .sort((a, b) => (a.order_index || 0) - (b.order_index || 0))
               .map((item) => (
               <div key={item.id} className="flex items-center gap-3 p-3 bg-gray-50 rounded-lg">
                 <div className="text-2xl">{getContentTypeIcon(item.content_type)}</div>
