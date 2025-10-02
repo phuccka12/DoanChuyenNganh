@@ -2,7 +2,7 @@
 
 import { useState } from 'react';
 import Dashboard from './Dashboard';
-import AnalyticsDashboard from '../../components/admin/AnalyticsDashboard';
+import AnalyticsDashboard from './AnalyticsDashboard';
 import LearningPathPage from './LearningPathPage';
 import UsersPage from './UsersPage';
 import {

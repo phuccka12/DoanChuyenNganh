@@ -30,7 +30,7 @@ import {
   Clock
 } from 'lucide-react';
 import { format, subDays, startOfMonth, eachDayOfInterval } from 'date-fns';
-import { MetricCard, LoadingSpinner } from '../ui/Analytics';
+import { MetricCard, LoadingSpinner } from '../../components/ui/Analytics';
 
 interface AnalyticsData {
   totalUsers: number;

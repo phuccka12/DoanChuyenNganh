@@ -1,5 +1,5 @@
 // Simple Users Management Page
-import RealUsersPage from '@/app/components/admin/RealUsersPage';
+import RealUsersPage from '../RealUsersPage';
 
 export default function UsersPage() {
   return <RealUsersPage />;
