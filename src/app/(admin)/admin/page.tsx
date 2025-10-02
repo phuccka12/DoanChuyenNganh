@@ -1,6 +1,6 @@
-// Admin Dashboard Page with Navigation
-import AdminLayout from './AdminLayout';
+// Admin Dashboard Page
+import Dashboard from './Dashboard';
 
 export default async function AdminDashboardPage() {
-  return <AdminLayout />;
+  return <Dashboard />;
 }

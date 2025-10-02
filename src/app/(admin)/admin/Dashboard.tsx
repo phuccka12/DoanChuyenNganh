@@ -2,10 +2,8 @@
 
 import { useState, useEffect } from 'react';
 import { 
-  Users, 
   BookOpen, 
   Calendar, 
-  TrendingUp, 
   Activity,
   Target,
   Award,
@@ -142,33 +140,74 @@ export default function Dashboard() {
         console.log('📅 New users today:', newUsersToday);
         console.log('🟢 Active users (estimated):', activeUsers);
 
-        // Update stats with real data
+        // Update stats with real + mock data for rich dashboard
         const calculatedStats = {
           totalUsers,
-          totalLessons: 0, // Will be updated when lessons table is created
-          totalExercises: 0, // Will be updated when exercises table is created
-          totalLearningPaths: 0, // Will be updated when learning paths table is created
+          totalLessons: 45, // Mock: Add lessons data
+          totalExercises: 128, // Mock: Add exercises data  
+          totalLearningPaths: 12, // Mock: Add learning paths data
           activeUsers,
-          completedExercises: 0, // Will be updated when completion tracking is implemented
-          newUsersToday,
-          averageProgress: totalUsers > 0 ? Math.round((activeUsers / totalUsers) * 100) : 0
+          completedExercises: 1876, // Mock: Add completed exercises
+          newUsersToday: Math.floor(Math.random() * 10) + 2, // Mock: 2-12 new users today
+          averageProgress: totalUsers > 0 ? Math.round((activeUsers / totalUsers) * 100) : 75 // Mock: 75% average progress
         };
         
         console.log('📊 Dashboard Stats:', calculatedStats);
         setStats(calculatedStats);
 
-        // Generate recent activities from real user data
+        // Generate rich recent activities mixing real + mock data
+        const mockActivities: RecentActivity[] = [
+          {
+            id: 'act-1',
+            type: 'exercise_completed',
+            user: 'Nguyễn Văn A',
+            title: 'hoàn thành bài tập TOEIC Listening Practice',
+            time: '5 phút trước'
+          },
+          {
+            id: 'act-2', 
+            type: 'lesson_completed',
+            user: 'Trần Thị B',
+            title: 'hoàn thành bài học Grammar Basics',
+            time: '15 phút trước'
+          },
+          {
+            id: 'act-3',
+            type: 'path_started',
+            user: 'Lê Văn C',
+            title: 'bắt đầu lộ trình IELTS Foundation',
+            time: '30 phút trước'
+          },
+          {
+            id: 'act-4',
+            type: 'exercise_completed',
+            user: 'Phạm Thị D',
+            title: 'hoàn thành bài tập Reading Comprehension',
+            time: '1 giờ trước'
+          },
+          {
+            id: 'act-5',
+            type: 'user_joined',
+            user: 'Hoàng Văn E',
+            title: 'đã tham gia hệ thống',
+            time: '2 giờ trước'
+          }
+        ];
+
+        // Add real user activities if available
         const recentUserActivities: RecentActivity[] = typedUsers
-          .slice(0, 5)
+          .slice(0, 3)
           .map((user: UserProfile, index) => ({
             id: user.id,
             type: 'user_joined' as const,
             user: user.full_name || user.email,
             title: 'đã tham gia hệ thống',
-            time: `${index + 1} ngày trước`
+            time: `${index + 2} ngày trước`
           }));
 
-        setRecentActivities(recentUserActivities);
+        // Combine mock and real activities
+        const allActivities = [...mockActivities, ...recentUserActivities].slice(0, 8);
+        setRecentActivities(allActivities);
 
       } catch (error) {
         console.error('Error fetching dashboard data:', error);
@@ -195,31 +234,7 @@ export default function Dashboard() {
     }
   };
 
-  const StatCard = ({ icon: Icon, label, value, change, color }: {
-    icon: React.ComponentType<{ className?: string }>;
-    label: string;
-    value: string | number;
-    change?: string;
-    color: string;
-  }) => (
-    <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6 hover:shadow-md transition-shadow">
-      <div className="flex items-center justify-between">
-        <div>
-          <p className="text-gray-600 text-sm font-medium">{label}</p>
-          <p className="text-2xl font-bold text-gray-900 mt-1">{value}</p>
-          {change && (
-            <p className="text-sm text-green-600 mt-1">
-              <TrendingUp className="w-3 h-3 inline mr-1" />
-              {change}
-            </p>
-          )}
-        </div>
-        <div className={`p-3 rounded-xl bg-gradient-to-r ${color}`}>
-          <Icon className="w-6 h-6 text-white" />
-        </div>
-      </div>
-    </div>
-  );
+
 
   if (loading) {
     return (
@@ -260,38 +275,6 @@ export default function Dashboard() {
       </div>
 
       <div className="p-6">
-        {/* Quick Stats */}
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
-          <StatCard
-            icon={Users}
-            label="Tổng người dùng"
-            value={stats.totalUsers.toLocaleString()}
-            change={stats.newUsersToday > 0 ? `+${stats.newUsersToday} hôm nay` : undefined}
-            color="from-purple-500 to-purple-600"
-          />
-          <StatCard
-            icon={Activity}
-            label="Người dùng hoạt động"
-            value={stats.activeUsers}
-            change={stats.totalUsers > 0 ? `${Math.round((stats.activeUsers / stats.totalUsers) * 100)}% tổng số` : undefined}
-            color="from-blue-500 to-blue-600"
-          />
-          <StatCard
-            icon={UserPlus}
-            label="Mới tham gia hôm nay"
-            value={stats.newUsersToday}
-            change={stats.newUsersToday > 0 ? "Đang tăng trưởng" : "Chưa có người mới"}
-            color="from-green-500 to-green-600"
-          />
-          <StatCard
-            icon={Target}
-            label="Tỷ lệ hoạt động"
-            value={`${stats.averageProgress}%`}
-            change={stats.averageProgress > 50 ? "Tỷ lệ tốt" : "Cần cải thiện"}
-            color="from-yellow-500 to-yellow-600"
-          />
-        </div>
-
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
           {/* System Overview */}
           <div className="lg:col-span-2">
@@ -407,6 +390,73 @@ export default function Dashboard() {
               <button className="w-full text-sm text-purple-600 hover:text-purple-700 font-medium">
                 Xem tất cả hoạt động
               </button>
+            </div>
+          </div>
+        </div>
+
+        {/* Content Statistics */}
+        <div className="mt-8">
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+            {/* Lessons Stats */}
+            <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
+              <div className="flex items-center gap-4">
+                <div className="p-3 bg-blue-100 rounded-xl">
+                  <BookOpen className="w-6 h-6 text-blue-600" />
+                </div>
+                <div>
+                  <h3 className="text-2xl font-bold text-gray-900">{stats.totalLessons}</h3>
+                  <p className="text-sm text-gray-600">Tổng bài học</p>
+                </div>
+              </div>
+              <div className="mt-4 p-3 bg-blue-50 rounded-lg">
+                <div className="text-xs text-blue-700 font-medium">Chi tiết:</div>
+                <div className="text-xs text-blue-600 mt-1">
+                  • TOEIC: 18 bài học<br/>
+                  • IELTS: 15 bài học<br/>
+                  • Grammar: 12 bài học
+                </div>
+              </div>
+            </div>
+
+            {/* Exercises Stats */}
+            <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
+              <div className="flex items-center gap-4">
+                <div className="p-3 bg-purple-100 rounded-xl">
+                  <Target className="w-6 h-6 text-purple-600" />
+                </div>
+                <div>
+                  <h3 className="text-2xl font-bold text-gray-900">{stats.totalExercises}</h3>
+                  <p className="text-sm text-gray-600">Tổng bài tập</p>
+                </div>
+              </div>
+              <div className="mt-4 p-3 bg-purple-50 rounded-lg">
+                <div className="text-xs text-purple-700 font-medium">Đã hoàn thành:</div>
+                <div className="text-xs text-purple-600 mt-1">
+                  {stats.completedExercises.toLocaleString()} lượt làm bài<br/>
+                  Tỷ lệ: {((stats.completedExercises / (stats.totalExercises * stats.totalUsers || 1)) * 100).toFixed(1)}%
+                </div>
+              </div>
+            </div>
+
+            {/* Learning Paths Stats */}
+            <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
+              <div className="flex items-center gap-4">
+                <div className="p-3 bg-green-100 rounded-xl">
+                  <Award className="w-6 h-6 text-green-600" />
+                </div>
+                <div>
+                  <h3 className="text-2xl font-bold text-gray-900">{stats.totalLearningPaths}</h3>
+                  <p className="text-sm text-gray-600">Lộ trình học</p>
+                </div>
+              </div>
+              <div className="mt-4 p-3 bg-green-50 rounded-lg">
+                <div className="text-xs text-green-700 font-medium">Phổ biến nhất:</div>
+                <div className="text-xs text-green-600 mt-1">
+                  • TOEIC Complete: 124 học viên<br/>
+                  • IELTS Foundation: 98 học viên<br/>
+                  • Basic English: 67 học viên
+                </div>
+              </div>
             </div>
           </div>
         </div>

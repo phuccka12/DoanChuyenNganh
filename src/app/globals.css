@@ -24,6 +24,49 @@ body {
   color: var(--foreground);
   font-family: Arial, Helvetica, sans-serif;
 }
+
+/* Force black text color for all input elements */
+input, 
+input[type="text"], 
+input[type="email"], 
+input[type="password"], 
+input[type="number"], 
+input[type="search"],
+textarea,
+select {
+  color: #000000 !important;
+  background-color: #ffffff !important;
+}
+
+/* Ensure placeholder text is visible */
+input::placeholder,
+textarea::placeholder {
+  color: #6B7280 !important;
+}
+
+/* Force black text in focus state */
+input:focus,
+textarea:focus,
+select:focus {
+  color: #000000 !important;
+  background-color: #ffffff !important;
+}
+
+/* Override any Tailwind or other CSS that might change text color in forms */
+.form-input,
+.form-textarea,
+.form-select {
+  color: #000000 !important;
+  background-color: #ffffff !important;
+}
+
+/* Target specific form classes that might be used */
+form input,
+form textarea,
+form select {
+  color: #000000 !important;
+  background-color: #ffffff !important;
+}
 @keyframes gradient-x {
   0%, 100% {
     background-size: 200% 200%;

@@ -17,14 +17,10 @@ import {
   RefreshCw
 } from 'lucide-react';
 
-type LearningPath = Database['public']['Tables']['learning_paths']['Row'];
 type CurriculumItem = Database['public']['Tables']['curriculum_items']['Row'];
 type UserLearningPath = Database['public']['Tables']['user_learning_paths']['Row'];
 
-interface PathWithRelations extends LearningPath {
-  curriculum_items?: { id: string }[];
-  user_learning_paths?: { id: string; user_id: string; overall_progress: number | null }[];
-}
+
 
 interface PathWithProgress {
   id: string;
@@ -68,99 +64,41 @@ export default function LearningPathPage() {
   const [filterCourse, setFilterCourse] = useState<string>('all');
   const [filterLevel, setFilterLevel] = useState<string>('all');
   const [searchQuery, setSearchQuery] = useState('');
+  const [showCreateModal, setShowCreateModal] = useState(false);
+  const [createLoading, setCreateLoading] = useState(false);
+  const [formData, setFormData] = useState({
+    name: '',
+    description: '',
+    course_type: 'TOEIC',
+    level: 'Beginner',
+    target_score: '',
+    duration_weeks: '',
+    difficulty_level: '1',
+    prerequisites: ''
+  });
   
   const supabase = createClientComponentClient<Database>();
-
-  useEffect(() => {
-    const loadPaths = async () => {
-      try {
-        setLoading(true);
-        
-        const { data: pathsData, error: pathsError } = await supabase
-          .from('learning_paths')
-          .select(`
-            *,
-            curriculum_items(id),
-            user_learning_paths(
-              id,
-              user_id,
-              overall_progress
-            )
-          `)
-          .eq('is_active', true)
-          .order('course_type')
-          .order('difficulty_level');
-
-        if (pathsError) throw pathsError;
-
-        // Process data to include real counts and statistics
-        const pathsWithStats: PathWithProgress[] = (pathsData as PathWithRelations[]).map(path => {
-          const enrolledUsers = path.user_learning_paths?.length || 0;
-          const avgCompletion = enrolledUsers > 0 && path.user_learning_paths
-            ? Math.round(
-                path.user_learning_paths.reduce((acc: number, ulp) => acc + (ulp.overall_progress || 0), 0) / enrolledUsers
-              ) 
-            : 0;
-
-          return {
-            ...path,
-            curriculum_count: path.curriculum_items?.length || 0,
-            enrolled_users: enrolledUsers,
-            avg_completion: avgCompletion
-          } as PathWithProgress;
-        });
-
-        setPaths(pathsWithStats);
-      } catch (err) {
-        console.error('Error fetching learning paths:', err);
-        setError('Không thể tải dữ liệu lộ trình học');
-      } finally {
-        setLoading(false);
-      }
-    };
-
-    loadPaths();
-  }, [supabase]);
 
   const fetchLearningPaths = async () => {
     try {
       setLoading(true);
       
-      const { data: pathsData, error: pathsError } = await supabase
-        .from('learning_paths')
-        .select(`
-          *,
-          curriculum_items(id),
-          user_learning_paths(
-            id,
-            user_id,
-            overall_progress
-          )
-        `)
-        .eq('is_active', true)
-        .order('course_type')
-        .order('difficulty_level');
+      // Use API route instead of direct Supabase call to avoid relationship issues
+      const response = await fetch('/api/learning-paths');
+      const result = await response.json();
+      
+      if (!response.ok) {
+        throw new Error(result.error || 'Failed to fetch learning paths');
+      }
 
-      if (pathsError) throw pathsError;
+      if (!result.success || !result.data) {
+        throw new Error('Invalid response format');
+      }
 
-      // Process data to include real counts and statistics
-      const pathsWithStats: PathWithProgress[] = (pathsData as PathWithRelations[]).map(path => {
-        const enrolledUsers = path.user_learning_paths?.length || 0;
-        const avgCompletion = enrolledUsers > 0 && path.user_learning_paths
-          ? Math.round(
-              path.user_learning_paths.reduce((acc: number, ulp) => acc + (ulp.overall_progress || 0), 0) / enrolledUsers
-            ) 
-          : 0;
+      const pathsData = result.data;
 
-        return {
-          ...path,
-          curriculum_count: path.curriculum_items?.length || 0,
-          enrolled_users: enrolledUsers,
-          avg_completion: avgCompletion
-        } as PathWithProgress;
-      });
-
-      setPaths(pathsWithStats);
+      // Data already processed by API with mock statistics
+      setPaths(pathsData as PathWithProgress[]);
     } catch (err) {
       console.error('Error fetching learning paths:', err);
       setError('Không thể tải dữ liệu lộ trình học');
@@ -168,6 +106,10 @@ export default function LearningPathPage() {
       setLoading(false);
     }
   };
+
+  useEffect(() => {
+    fetchLearningPaths();
+  }, []);
 
   const fetchPathDetails = async (pathId: string) => {
     try {
@@ -186,6 +128,66 @@ export default function LearningPathPage() {
     } catch (err) {
       console.error('Error fetching path details:', err);
       setError('Không thể tải chi tiết lộ trình');
+    }
+  };
+
+  const handleCreatePath = async () => {
+    try {
+      setCreateLoading(true);
+      setError('');
+
+      // Validate required fields
+      if (!formData.name || !formData.course_type) {
+        setError('Vui lòng điền đầy đủ thông tin bắt buộc');
+        return;
+      }
+
+      const createData = {
+        name: formData.name,
+        description: formData.description || null,
+        course_type: formData.course_type,
+        level: formData.level,
+        target_score: formData.target_score ? parseInt(formData.target_score) : null,
+        duration_weeks: formData.duration_weeks ? parseInt(formData.duration_weeks) : null,
+        difficulty_level: parseInt(formData.difficulty_level),
+        prerequisites: formData.prerequisites || null
+      };
+
+      const response = await fetch('/api/learning-paths', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(createData),
+      });
+
+      const result = await response.json();
+
+      if (!response.ok) {
+        throw new Error(result.error || 'Failed to create learning path');
+      }
+
+      // Reset form and close modal
+      setFormData({
+        name: '',
+        description: '',
+        course_type: 'TOEIC',
+        level: 'Beginner',
+        target_score: '',
+        duration_weeks: '',
+        difficulty_level: '1',
+        prerequisites: ''
+      });
+      setShowCreateModal(false);
+
+      // Refresh the paths list
+      await fetchLearningPaths();
+
+    } catch (err) {
+      console.error('Error creating learning path:', err);
+      setError(err instanceof Error ? err.message : 'Không thể tạo lộ trình học');
+    } finally {
+      setCreateLoading(false);
     }
   };
 
@@ -253,7 +255,7 @@ export default function LearningPathPage() {
   return (
     <div className="p-6 space-y-8">
       {/* Header */}
-      <div className="text-center space-y-4">
+      <div className="text-center space-y-4 relative">
         <div className="flex items-center justify-center gap-3">
           <div className="p-3 bg-gradient-to-r from-blue-500 to-purple-600 rounded-full text-white">
             <BookOpen className="w-8 h-8" />
@@ -266,6 +268,25 @@ export default function LearningPathPage() {
           Khám phá các lộ trình học được thiết kế chuyên biệt cho TOEIC, IELTS và APTIS. 
           Mỗi lộ trình đều có curriculum chi tiết và hệ thống theo dõi tiến độ.
         </p>
+        
+        {/* Create & Refresh Buttons */}
+        <div className="absolute top-0 right-0 flex gap-3">
+          <button
+            onClick={fetchLearningPaths}
+            disabled={loading}
+            className="flex items-center gap-2 px-4 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors shadow-lg disabled:opacity-50"
+          >
+            <RefreshCw className={`w-5 h-5 ${loading ? 'animate-spin' : ''}`} />
+            Làm mới
+          </button>
+          <button
+            onClick={() => setShowCreateModal(true)}
+            className="flex items-center gap-2 px-6 py-3 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors shadow-lg"
+          >
+            <BookOpen className="w-5 h-5" />
+            Tạo lộ trình học mới
+          </button>
+        </div>
       </div>
 
       {/* Filters & Search */}
@@ -352,6 +373,185 @@ export default function LearningPathPage() {
           activeTab={activeTab}
           setActiveTab={setActiveTab}
         />
+      )}
+
+      {/* Create Learning Path Modal */}
+      {showCreateModal && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-xl shadow-xl max-w-2xl w-full max-h-[90vh] overflow-y-auto">
+            <div className="p-6 border-b border-gray-200">
+              <div className="flex items-center justify-between">
+                <h2 className="text-2xl font-bold text-gray-800">Tạo lộ trình học mới</h2>
+                <button
+                  onClick={() => setShowCreateModal(false)}
+                  className="text-gray-500 hover:text-gray-700"
+                >
+                  <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                  </svg>
+                </button>
+              </div>
+            </div>
+
+            <div className="p-6 space-y-6">
+              {error && (
+                <div className="p-4 bg-red-50 border border-red-200 rounded-lg">
+                  <p className="text-red-800">{error}</p>
+                </div>
+              )}
+
+              {/* Form Fields */}
+              <div className="space-y-4">
+                {/* Name */}
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    Tên lộ trình học <span className="text-red-500">*</span>
+                  </label>
+                  <input
+                    type="text"
+                    value={formData.name}
+                    onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                    placeholder="Ví dụ: TOEIC 600+ trong 3 tháng"
+                  />
+                </div>
+
+                {/* Description */}
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    Mô tả
+                  </label>
+                  <textarea
+                    value={formData.description}
+                    onChange={(e) => setFormData({ ...formData, description: e.target.value })}
+                    rows={3}
+                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                    placeholder="Mô tả chi tiết về lộ trình học này..."
+                  />
+                </div>
+
+                {/* Course Type & Level */}
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">
+                      Loại khóa học <span className="text-red-500">*</span>
+                    </label>
+                    <select
+                      value={formData.course_type}
+                      onChange={(e) => setFormData({ ...formData, course_type: e.target.value })}
+                      className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                    >
+                      <option value="TOEIC">TOEIC</option>
+                      <option value="IELTS">IELTS</option>
+                      <option value="APTIS">APTIS</option>
+                    </select>
+                  </div>
+
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">
+                      Trình độ
+                    </label>
+                    <select
+                      value={formData.level}
+                      onChange={(e) => setFormData({ ...formData, level: e.target.value })}
+                      className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                    >
+                      <option value="Beginner">Beginner</option>
+                      <option value="Elementary">Elementary</option>
+                      <option value="Intermediate">Intermediate</option>
+                      <option value="Upper-Intermediate">Upper-Intermediate</option>
+                      <option value="Advanced">Advanced</option>
+                    </select>
+                  </div>
+                </div>
+
+                {/* Target Score & Duration */}
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">
+                      Điểm mục tiêu
+                    </label>
+                    <input
+                      type="number"
+                      value={formData.target_score}
+                      onChange={(e) => setFormData({ ...formData, target_score: e.target.value })}
+                      className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                      placeholder="600"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">
+                      Thời gian (tuần)
+                    </label>
+                    <input
+                      type="number"
+                      value={formData.duration_weeks}
+                      onChange={(e) => setFormData({ ...formData, duration_weeks: e.target.value })}
+                      className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                      placeholder="12"
+                    />
+                  </div>
+                </div>
+
+                {/* Difficulty Level */}
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    Mức độ khó (1-5)
+                  </label>
+                  <select
+                    value={formData.difficulty_level}
+                    onChange={(e) => setFormData({ ...formData, difficulty_level: e.target.value })}
+                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                  >
+                    <option value="1">1 - Rất dễ</option>
+                    <option value="2">2 - Dễ</option>
+                    <option value="3">3 - Trung bình</option>
+                    <option value="4">4 - Khó</option>
+                    <option value="5">5 - Rất khó</option>
+                  </select>
+                </div>
+
+                {/* Prerequisites */}
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    Yêu cầu trước khi học
+                  </label>
+                  <textarea
+                    value={formData.prerequisites}
+                    onChange={(e) => setFormData({ ...formData, prerequisites: e.target.value })}
+                    rows={2}
+                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                    placeholder="Ví dụ: Hoàn thành khóa học cơ bản, có điểm TOEIC 400+..."
+                  />
+                </div>
+              </div>
+            </div>
+
+            <div className="p-6 border-t border-gray-200 flex justify-end gap-4">
+              <button
+                onClick={() => setShowCreateModal(false)}
+                className="px-6 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50"
+              >
+                Hủy
+              </button>
+              <button
+                onClick={handleCreatePath}
+                disabled={createLoading}
+                className="px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 flex items-center gap-2"
+              >
+                {createLoading ? (
+                  <>
+                    <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
+                    Đang tạo...
+                  </>
+                ) : (
+                  'Tạo lộ trình'
+                )}
+              </button>
+            </div>
+          </div>
+        </div>
       )}
     </div>
   );
@@ -589,6 +789,8 @@ function PathOverview({ path }: { path: DetailedPath }) {
           </div>
         </div>
       </div>
+
+
     </div>
   );
 }
@@ -596,7 +798,7 @@ function PathOverview({ path }: { path: DetailedPath }) {
 // Curriculum Tab Component  
 function PathCurriculum({ curriculum }: { curriculum: CurriculumItem[] }) {
   const groupedByWeek = curriculum.reduce((acc, item) => {
-    const week = item.week_number;
+    const week = item.week_number || 0; // Default to week 0 if null
     if (!acc[week]) acc[week] = [];
     acc[week].push(item);
     return acc;
