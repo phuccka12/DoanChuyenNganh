@@ -1,6 +1,6 @@
 // Admin Dashboard Page
-import Dashboard from './Dashboard';
+import NewDashboard from './NewDashboard';
 
 export default async function AdminDashboardPage() {
-  return <Dashboard />;
+  return <NewDashboard />;
 }

@@ -1,8 +1,6 @@
 'use client';
 
 import { useState, useEffect, useCallback } from 'react';
-// import { createClientComponentClient } from '@supabase/auth-helpers-nextjs';
-// import type { Database } from '@/lib/database.types';
 import {
   BookOpen,
   Clock,
@@ -14,12 +12,49 @@ import {
   Trash2,
   Eye,
   RefreshCw,
-  CheckCircle,
   XCircle,
   Upload,
   FileText,
-  File
+  File,
+  Power,
+  PowerOff
 } from 'lucide-react';
+
+// Constants
+const EXERCISE_TYPES = [
+  { value: 'multiple_choice', label: 'Trắc nghiệm' },
+  { value: 'true_false', label: 'Đúng/Sai' },
+  { value: 'fill_blank', label: 'Điền khuyết' },
+  { value: 'essay', label: 'Tự luận' },
+  { value: 'speaking', label: 'Nói tự do' }
+];
+
+const DIFFICULTY_LEVELS = [
+  { value: 'easy', label: 'Dễ' },
+  { value: 'medium', label: 'Trung bình' },
+  { value: 'hard', label: 'Khó' }
+];
+
+const QUESTION_TYPES = [
+  { value: 'multiple_choice', label: 'Trắc nghiệm' },
+  { value: 'true_false', label: 'Đúng/Sai' },
+  { value: 'fill_blank', label: 'Điền khuyết' },
+  { value: 'essay', label: 'Tự luận' }
+];
+
+// Helper functions
+const getTypeLabel = (type: string) => EXERCISE_TYPES.find(t => t.value === type)?.label || type;
+const getDifficultyLabel = (difficulty: string) => DIFFICULTY_LEVELS.find(d => d.value === difficulty)?.label || difficulty;
+const getQuestionTypeLabel = (type: string) => QUESTION_TYPES.find(q => q.value === type)?.label || type;
+
+const getDifficultyColor = (difficulty: string) => {
+  switch (difficulty) {
+    case 'easy': return 'bg-green-100 text-green-800';
+    case 'medium': return 'bg-yellow-100 text-yellow-800';
+    case 'hard': return 'bg-red-100 text-red-800';
+    default: return 'bg-gray-100 text-gray-800';
+  }
+};
 
 interface Exercise {
   id: string;
@@ -33,6 +68,7 @@ interface Exercise {
   is_active: boolean;
   created_at: string;
   questions?: Question[];
+  source_file_url?: string | null;
 }
 
 interface Question {
@@ -42,6 +78,7 @@ interface Question {
   points: number;
   options?: string[];
   correct_answer: string;
+  explanation?: string;
 }
 
 interface NewExercise {
@@ -84,12 +121,14 @@ export default function ExerciseManagement() {
   const [showEditModal, setShowEditModal] = useState(false);
   const [editingExercise, setEditingExercise] = useState<Exercise | null>(null);
   const [showUploadModal, setShowUploadModal] = useState(false);
+  const [showDetailModal, setShowDetailModal] = useState(false);
+  const [selectedExercise, setSelectedExercise] = useState<Exercise | null>(null);
   const [createLoading, setCreateLoading] = useState(false);
-  const [uploadLoading, setUploadLoading] = useState(false);
   const [uploadedFile, setUploadedFile] = useState<File | null>(null);
   const [parsedContent, setParsedContent] = useState<ParsedContent | null>(null);
   const [fileUploadLoading, setFileUploadLoading] = useState(false);
   const [uploadedFileUrl, setUploadedFileUrl] = useState<string | null>(null);
+  const [uploadSuccessMessage, setUploadSuccessMessage] = useState<string>('');
   const [searchQuery, setSearchQuery] = useState('');
   const [filterType, setFilterType] = useState<string>('all');
   const [filterDifficulty, setFilterDifficulty] = useState<string>('all');
@@ -105,7 +144,10 @@ export default function ExerciseManagement() {
   });
 
   const [questions, setQuestions] = useState<NewQuestion[]>([]);
+  const [existingQuestions, setExistingQuestions] = useState<Question[]>([]);
   const [showAddQuestion, setShowAddQuestion] = useState(false);
+  const [editingQuestionIndex, setEditingQuestionIndex] = useState<number | null>(null);
+  const [editingExistingQuestionIndex, setEditingExistingQuestionIndex] = useState<number | null>(null);
   const [currentQuestion, setCurrentQuestion] = useState<NewQuestion>({
     question_text: '',
     question_type: '',
@@ -113,29 +155,6 @@ export default function ExerciseManagement() {
     options: ['', '', '', ''],
     correct_answer: ''
   });
-
-  // const supabase = createClientComponentClient<Database>();
-
-  const exerciseTypes = [
-    { value: 'multiple_choice', label: 'Trắc nghiệm' },
-    { value: 'true_false', label: 'Đúng/Sai' },
-    { value: 'fill_blank', label: 'Điền khuyết' },
-    { value: 'essay', label: 'Tự luận' },
-    { value: 'speaking', label: 'Nói tự do' }
-  ];
-
-  const difficultyLevels = [
-    { value: 'easy', label: 'Dễ' },
-    { value: 'medium', label: 'Trung bình' },
-    { value: 'hard', label: 'Khó' }
-  ];
-
-  const questionTypes = [
-    { value: 'multiple_choice', label: 'Trắc nghiệm' },
-    { value: 'true_false', label: 'Đúng/Sai' },
-    { value: 'fill_blank', label: 'Điền khuyết' },
-    { value: 'essay', label: 'Tự luận' }
-  ];
 
   const fetchExercises = useCallback(async () => {
     try {
@@ -220,7 +239,8 @@ export default function ExerciseManagement() {
           max_score: parseInt(formData.max_score) || 100,
           time_limit_minutes: formData.time_limit_minutes ? parseInt(formData.time_limit_minutes) : null,
           lesson_id: formData.lesson_id || null,
-          questions
+          questions,
+          source_file_url: uploadedFileUrl || null
         })
       });
 
@@ -242,6 +262,13 @@ export default function ExerciseManagement() {
         });
         setQuestions([]);
         setShowCreateModal(false);
+        
+        // Reset upload-related state
+        setShowUploadModal(false);
+        setUploadedFile(null);
+        setUploadedFileUrl(null);
+        setUploadSuccessMessage('');
+        setParsedContent(null);
       } else {
         throw new Error(data.error || 'Không thể tạo bài tập mới');
       }
@@ -265,7 +292,13 @@ export default function ExerciseManagement() {
       time_limit_minutes: exercise.time_limit_minutes?.toString() || '',
       lesson_id: exercise.lesson_id || ''
     });
-    setQuestions(exercise.questions || []);
+    
+    // Load existing questions from the database
+    setExistingQuestions(exercise.questions || []);
+    
+    // Reset new questions state
+    setQuestions([]);
+    
     setShowEditModal(true);
   };
 
@@ -281,17 +314,25 @@ export default function ExerciseManagement() {
       setCreateLoading(true);
       setError('');
 
+      const payload = {
+        ...formData,
+        max_score: parseInt(formData.max_score) || 0,
+        time_limit_minutes: formData.time_limit_minutes ? parseInt(formData.time_limit_minutes) : null,
+        lesson_id: formData.lesson_id || null, // Convert empty string to null for UUID field
+        existingQuestions: existingQuestions,
+        newQuestions: questions
+      };
+
+      console.log('Sending payload:', payload);
+      console.log('Existing questions:', existingQuestions);
+      console.log('New questions:', questions);
+
       const response = await fetch(`/api/exercises/${editingExercise.id}`, {
         method: 'PUT',
         headers: {
           'Content-Type': 'application/json'
         },
-        body: JSON.stringify({
-          ...formData,
-          max_score: parseInt(formData.max_score) || 0,
-          time_limit_minutes: formData.time_limit_minutes ? parseInt(formData.time_limit_minutes) : null,
-          questions
-        })
+        body: JSON.stringify(payload)
       });
 
       const data = await response.json();
@@ -313,6 +354,8 @@ export default function ExerciseManagement() {
           lesson_id: ''
         });
         setQuestions([]);
+        setExistingQuestions([]);
+        setEditingExercise(null);
         setShowEditModal(false);
         setEditingExercise(null);
       } else {
@@ -347,13 +390,105 @@ export default function ExerciseManagement() {
     }
   };
 
-  const handleAddQuestion = () => {
+  const handleToggleStatus = async (exerciseId: string, currentStatus: boolean) => {
+    try {
+      const response = await fetch(`/api/exercises/${exerciseId}/toggle-status`, {
+        method: 'PATCH',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({ is_active: !currentStatus })
+      });
+
+      if (response.ok) {
+        const updatedExercise = await response.json();
+        setExercises(prev => 
+          prev.map(ex => 
+            ex.id === exerciseId ? { ...ex, is_active: updatedExercise.is_active } : ex
+          )
+        );
+      } else {
+        const data = await response.json();
+        throw new Error(data.error || 'Không thể cập nhật trạng thái');
+      }
+    } catch (err) {
+      console.error('Error toggling exercise status:', err);
+      setError(err instanceof Error ? err.message : 'Không thể cập nhật trạng thái');
+    }
+  };
+
+  const handleViewDetail = async (exerciseId: string) => {
+    try {
+      const response = await fetch(`/api/exercises/${exerciseId}`);
+      const data = await response.json();
+      
+      if (response.ok) {
+        setSelectedExercise(data.exercise);
+        setShowDetailModal(true);
+      } else {
+        throw new Error(data.error || 'Không thể tải chi tiết bài tập');
+      }
+    } catch (err) {
+      console.error('Error fetching exercise detail:', err);
+      setError(err instanceof Error ? err.message : 'Không thể tải chi tiết bài tập');
+    }
+  };
+
+
+
+  const handleEditQuestion = (index: number) => {
+    const question = questions[index];
+    setCurrentQuestion(question);
+    setEditingQuestionIndex(index);
+    setEditingExistingQuestionIndex(null);
+    setShowAddQuestion(true);
+  };
+
+  const handleEditExistingQuestion = (index: number) => {
+    const question = existingQuestions[index];
+    setCurrentQuestion({
+      question_text: question.question_text,
+      question_type: question.question_type,
+      points: question.points.toString(),
+      options: question.options || ['', '', '', ''],
+      correct_answer: question.correct_answer
+    });
+    setEditingExistingQuestionIndex(index);
+    setEditingQuestionIndex(null);
+    setShowAddQuestion(true);
+  };
+
+  const handleUpdateQuestion = () => {
     if (!currentQuestion.question_text || !currentQuestion.question_type) {
       setError('Vui lòng điền đầy đủ thông tin câu hỏi');
       return;
     }
 
-    setQuestions(prev => [...prev, { ...currentQuestion }]);
+    if (editingQuestionIndex !== null) {
+      // Editing new question
+      setQuestions(prev => prev.map((q, index) => 
+        index === editingQuestionIndex ? { ...currentQuestion } : q
+      ));
+      setEditingQuestionIndex(null);
+    } else if (editingExistingQuestionIndex !== null) {
+      // Editing existing question
+      setExistingQuestions(prev => prev.map((q, index) => 
+        index === editingExistingQuestionIndex ? {
+          ...q,
+          question_text: currentQuestion.question_text,
+          question_type: currentQuestion.question_type,
+          points: parseInt(currentQuestion.points) || 0,
+          options: currentQuestion.options,
+          correct_answer: currentQuestion.correct_answer,
+          explanation: q.explanation
+        } : q
+      ));
+      setEditingExistingQuestionIndex(null);
+    } else {
+      // Adding new question
+      setQuestions(prev => [...prev, { ...currentQuestion }]);
+    }
+
     setCurrentQuestion({
       question_text: '',
       question_type: '',
@@ -361,6 +496,20 @@ export default function ExerciseManagement() {
       options: ['', '', '', ''],
       correct_answer: ''
     });
+    setShowAddQuestion(false);
+    setError('');
+  };
+
+  const handleCancelEdit = () => {
+    setCurrentQuestion({
+      question_text: '',
+      question_type: '',
+      points: '',
+      options: ['', '', '', ''],
+      correct_answer: ''
+    });
+    setEditingQuestionIndex(null);
+    setEditingExistingQuestionIndex(null);
     setShowAddQuestion(false);
     setError('');
   };
@@ -374,26 +523,7 @@ export default function ExerciseManagement() {
     return matchesSearch && matchesType && matchesDifficulty;
   });
 
-  const getTypeLabel = (type: string) => {
-    return exerciseTypes.find(t => t.value === type)?.label || type;
-  };
 
-  const getDifficultyLabel = (difficulty: string) => {
-    return difficultyLevels.find(d => d.value === difficulty)?.label || difficulty;
-  };
-
-  const getDifficultyColor = (difficulty: string) => {
-    switch (difficulty) {
-      case 'easy': return 'bg-green-100 text-green-800';
-      case 'medium': return 'bg-yellow-100 text-yellow-800';
-      case 'hard': return 'bg-red-100 text-red-800';
-      default: return 'bg-gray-100 text-gray-800';
-    }
-  };
-
-  const getQuestionTypeLabel = (type: string) => {
-    return questionTypes.find(q => q.value === type)?.label || type;
-  };
 
   const handleFileUpload = async (file: File) => {
     const maxSize = 10 * 1024 * 1024; // 10MB limit
@@ -415,38 +545,12 @@ export default function ExerciseManagement() {
     }
 
     setUploadedFile(file);
+    setUploadedFileUrl(null);
+    setUploadSuccessMessage('');
     setError('');
   };
 
-  const handleParseFile = async () => {
-    if (!uploadedFile) return;
-
-    try {
-      setUploadLoading(true);
-      setError('');
-
-      const formData = new FormData();
-      formData.append('file', uploadedFile);
-
-      const response = await fetch('/api/exercises/parse-file', {
-        method: 'POST',
-        body: formData
-      });
-
-      const data = await response.json();
-
-      if (response.ok) {
-        setParsedContent(data.content);
-      } else {
-        throw new Error(data.error || 'Không thể phân tích file');
-      }
-    } catch (err) {
-      console.error('Error parsing file:', err);
-      setError(err instanceof Error ? err.message : 'Không thể phân tích file');
-    } finally {
-      setUploadLoading(false);
-    }
-  };
+  // Removed handleParseFile: we now upload directly, no parsing step.
 
   const handleCreateFromFile = async () => {
     if (!parsedContent) return;
@@ -492,6 +596,40 @@ export default function ExerciseManagement() {
       setCreateLoading(false);
     }
   };
+
+  const handleUploadFileToStorage = async () => {
+    if (!uploadedFile) return;
+
+    try {
+      setFileUploadLoading(true);
+      setError('');
+      setUploadSuccessMessage('');
+
+      const formData = new FormData();
+      formData.append('file', uploadedFile);
+
+      const response = await fetch('/api/exercises/upload-file', {
+        method: 'POST',
+        body: formData
+      });
+
+      const data = await response.json();
+
+      if (response.ok) {
+        setUploadedFileUrl(data.data.publicUrl);
+        setUploadSuccessMessage('Upload file thành công! File đã được lưu vào Supabase.');
+      } else {
+        throw new Error(data.error || 'Không thể upload file');
+      }
+    } catch (err) {
+      console.error('Error uploading file:', err);
+      setError(err instanceof Error ? err.message : 'Không thể upload file');
+    } finally {
+      setFileUploadLoading(false);
+    }
+  };
+
+
 
   if (loading) {
     return (
@@ -544,6 +682,8 @@ export default function ExerciseManagement() {
         </div>
       </div>
 
+
+
       {/* Filters & Search */}
       <div className="bg-white rounded-xl shadow-lg p-6">
         <div className="flex flex-col lg:flex-row gap-4 items-center">
@@ -558,7 +698,7 @@ export default function ExerciseManagement() {
             className="px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent"
           >
             <option value="all">Tất cả loại</option>
-            {exerciseTypes.map(type => (
+            {EXERCISE_TYPES.map(type => (
               <option key={type.value} value={type.value}>{type.label}</option>
             ))}
           </select>
@@ -569,7 +709,7 @@ export default function ExerciseManagement() {
             className="px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent"
           >
             <option value="all">Tất cả độ khó</option>
-            {difficultyLevels.map(level => (
+            {DIFFICULTY_LEVELS.map(level => (
               <option key={level.value} value={level.value}>{level.label}</option>
             ))}
           </select>
@@ -635,14 +775,48 @@ export default function ExerciseManagement() {
                     <span>Thời gian: {exercise.time_limit_minutes} phút</span>
                   </div>
                 )}
-                <div className="flex items-center gap-2 text-sm text-gray-600">
-                  <CheckCircle className="w-4 h-4" />
-                  <span>Trạng thái: {exercise.is_active ? 'Đang hoạt động' : 'Tạm dừng'}</span>
+                <div className="flex items-center justify-between text-sm">
+                  <div className="flex items-center gap-2 text-gray-600">
+                    {exercise.is_active ? (
+                      <Power className="w-4 h-4 text-green-600" />
+                    ) : (
+                      <PowerOff className="w-4 h-4 text-gray-400" />
+                    )}
+                    <span>Trạng thái:</span>
+                  </div>
+                  <button
+                    onClick={() => handleToggleStatus(exercise.id, exercise.is_active)}
+                    className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 ${
+                      exercise.is_active ? 'bg-green-600' : 'bg-gray-300'
+                    }`}
+                  >
+                    <span
+                      className={`inline-block h-4 w-4 transform rounded-full bg-white shadow-lg transition-transform ${
+                        exercise.is_active ? 'translate-x-6' : 'translate-x-1'
+                      }`}
+                    />
+                  </button>
                 </div>
+                {exercise.source_file_url && (
+                  <div className="flex items-center gap-2 text-sm text-blue-600">
+                    <FileText className="w-4 h-4" />
+                    <a 
+                      href={exercise.source_file_url} 
+                      target="_blank" 
+                      rel="noopener noreferrer"
+                      className="hover:underline"
+                    >
+                      Xem file gốc
+                    </a>
+                  </div>
+                )}
               </div>
 
               <div className="flex gap-2">
-                <button className="flex-1 px-3 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors text-sm font-medium flex items-center justify-center gap-2">
+                <button 
+                  onClick={() => handleViewDetail(exercise.id)}
+                  className="flex-1 px-3 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors text-sm font-medium flex items-center justify-center gap-2"
+                >
                   <Eye className="w-4 h-4" />
                   Xem chi tiết
                 </button>
@@ -698,6 +872,20 @@ export default function ExerciseManagement() {
             </div>
 
             <div className="p-6 space-y-6">
+              {(error || uploadSuccessMessage) && (
+                <div className="space-y-2">
+                  {error && (
+                    <div className="px-4 py-2 rounded-lg bg-red-50 text-red-700 border border-red-200 text-sm">
+                      {error}
+                    </div>
+                  )}
+                  {uploadSuccessMessage && (
+                    <div className="px-4 py-2 rounded-lg bg-green-50 text-green-700 border border-green-200 text-sm">
+                      {uploadSuccessMessage}
+                    </div>
+                  )}
+                </div>
+              )}
               {error && (
                 <div className="p-4 bg-red-50 border border-red-200 rounded-lg">
                   <p className="text-red-800">{error}</p>
@@ -748,7 +936,7 @@ export default function ExerciseManagement() {
                       className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent"
                     >
                       <option value="">Chọn loại</option>
-                      {exerciseTypes.map(type => (
+                      {EXERCISE_TYPES.map(type => (
                         <option key={type.value} value={type.value}>{type.label}</option>
                       ))}
                     </select>
@@ -764,7 +952,7 @@ export default function ExerciseManagement() {
                       className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent"
                     >
                       <option value="">Chọn độ khó</option>
-                      {difficultyLevels.map(level => (
+                      {DIFFICULTY_LEVELS.map(level => (
                         <option key={level.value} value={level.value}>{level.label}</option>
                       ))}
                     </select>
@@ -848,7 +1036,7 @@ export default function ExerciseManagement() {
                           <div className="flex-1">
                             <p className="font-medium text-gray-900">Câu {index + 1}: {question.question_text}</p>
                             <p className="text-sm text-gray-600 mt-1">
-                              Loại: {questionTypes.find(t => t.value === question.question_type)?.label} • 
+                              Loại: {QUESTION_TYPES.find(t => t.value === question.question_type)?.label} • 
                               Điểm: {question.points || 10}
                             </p>
                           </div>
@@ -906,7 +1094,9 @@ export default function ExerciseManagement() {
           <div className="bg-white rounded-xl shadow-xl max-w-2xl w-full max-h-[90vh] overflow-y-auto">
             <div className="p-6 border-b border-gray-200">
               <div className="flex items-center justify-between">
-                <h3 className="text-xl font-bold text-gray-800">Thêm câu hỏi</h3>
+                <h3 className="text-xl font-bold text-gray-800">
+                  {editingQuestionIndex !== null ? 'Chỉnh sửa câu hỏi' : 'Thêm câu hỏi'}
+                </h3>
                 <button
                   onClick={() => setShowAddQuestion(false)}
                   className="text-gray-500 hover:text-gray-700"
@@ -945,7 +1135,7 @@ export default function ExerciseManagement() {
                     className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent"
                   >
                     <option value="">Chọn loại</option>
-                    {questionTypes.map(type => (
+                    {QUESTION_TYPES.map(type => (
                       <option key={type.value} value={type.value}>{type.label}</option>
                     ))}
                   </select>
@@ -1148,16 +1338,16 @@ export default function ExerciseManagement() {
 
             <div className="p-6 border-t border-gray-200 flex justify-end gap-4">
               <button
-                onClick={() => setShowAddQuestion(false)}
+                onClick={handleCancelEdit}
                 className="px-4 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50"
               >
                 Hủy
               </button>
               <button
-                onClick={handleAddQuestion}
+                onClick={handleUpdateQuestion}
                 className="px-4 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700"
               >
-                Thêm câu hỏi
+                {editingQuestionIndex !== null || editingExistingQuestionIndex !== null ? 'Cập nhật câu hỏi' : 'Thêm câu hỏi'}
               </button>
             </div>
           </div>
@@ -1175,6 +1365,8 @@ export default function ExerciseManagement() {
                   onClick={() => {
                     setShowEditModal(false);
                     setEditingExercise(null);
+                    setExistingQuestions([]);
+                    setQuestions([]);
                   }}
                   className="text-gray-400 hover:text-gray-600"
                 >
@@ -1209,7 +1401,7 @@ export default function ExerciseManagement() {
                     className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent"
                   >
                     <option value="">Chọn loại bài tập</option>
-                    {exerciseTypes.map(type => (
+                    {EXERCISE_TYPES.map(type => (
                       <option key={type.value} value={type.value}>{type.label}</option>
                     ))}
                   </select>
@@ -1225,7 +1417,7 @@ export default function ExerciseManagement() {
                     className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent"
                   >
                     <option value="">Chọn độ khó</option>
-                    {difficultyLevels.map(level => (
+                    {DIFFICULTY_LEVELS.map(level => (
                       <option key={level.value} value={level.value}>{level.label}</option>
                     ))}
                   </select>
@@ -1273,17 +1465,18 @@ export default function ExerciseManagement() {
                 />
               </div>
 
-              {/* Existing Questions */}
-              {questions.length > 0 && (
+              {/* Existing Questions from Database */}
+              {existingQuestions.length > 0 && (
                 <div>
                   <div className="flex items-center justify-between mb-4">
                     <h3 className="text-lg font-semibold text-gray-900">
-                      Câu hỏi đã thêm ({questions.length})
+                      Câu hỏi hiện có ({existingQuestions.length})
                     </h3>
+                    <span className="text-sm text-blue-600 bg-blue-50 px-2 py-1 rounded">Đã lưu</span>
                   </div>
                   <div className="space-y-4">
-                    {questions.map((question, index) => (
-                      <div key={index} className="bg-gray-50 rounded-lg p-4">
+                    {existingQuestions.map((question, index) => (
+                      <div key={question.id} className="bg-blue-50 rounded-lg p-4 border-l-4 border-blue-500">
                         <div className="flex items-start justify-between">
                           <div className="flex-1">
                             <h4 className="font-medium text-gray-900 mb-2">
@@ -1293,19 +1486,128 @@ export default function ExerciseManagement() {
                               <span>Loại: {getQuestionTypeLabel(question.question_type)}</span>
                               <span>Điểm: {question.points}</span>
                             </div>
+                            {question.options && question.options.length > 0 && (
+                              <div className="mt-2">
+                                <p className="text-sm text-gray-600 mb-1">Các lựa chọn:</p>
+                                <div className="grid grid-cols-2 gap-2">
+                                  {question.options.map((option, optIndex) => (
+                                    <div key={optIndex} className={`text-sm p-2 rounded ${
+                                      option === question.correct_answer 
+                                        ? 'bg-green-100 text-green-800 border border-green-300' 
+                                        : 'bg-gray-100 text-gray-700'
+                                    }`}>
+                                      {String.fromCharCode(65 + optIndex)}: {option}
+                                    </div>
+                                  ))}
+                                </div>
+                              </div>
+                            )}
                           </div>
-                          <button
-                            onClick={() => setQuestions(prev => prev.filter((_, i) => i !== index))}
-                            className="text-red-600 hover:text-red-800"
-                          >
-                            <Trash2 className="w-4 h-4" />
-                          </button>
+                          <div className="flex gap-2">
+                            <button
+                              onClick={() => handleEditExistingQuestion(index)}
+                              className="text-blue-600 hover:text-blue-800"
+                              title="Chỉnh sửa câu hỏi"
+                            >
+                              <Edit className="w-4 h-4" />
+                            </button>
+                            <button
+                              onClick={() => setExistingQuestions(prev => prev.filter((_, i) => i !== index))}
+                              className="text-red-600 hover:text-red-800"
+                              title="Xóa câu hỏi"
+                            >
+                              <Trash2 className="w-4 h-4" />
+                            </button>
+                          </div>
                         </div>
                       </div>
                     ))}
                   </div>
                 </div>
               )}
+
+              {/* New Questions */}
+              {questions.length > 0 && (
+                <div>
+                  <div className="flex items-center justify-between mb-4">
+                    <h3 className="text-lg font-semibold text-gray-900">
+                      Câu hỏi mới thêm ({questions.length})
+                    </h3>
+                    <span className="text-sm text-orange-600 bg-orange-50 px-2 py-1 rounded">Chưa lưu</span>
+                  </div>
+                  <div className="space-y-4">
+                    {questions.map((question, index) => (
+                      <div key={index} className="bg-orange-50 rounded-lg p-4 border-l-4 border-orange-500">
+                        <div className="flex items-start justify-between">
+                          <div className="flex-1">
+                            <h4 className="font-medium text-gray-900 mb-2">
+                              Câu {index + 1}: {question.question_text}
+                            </h4>
+                            <div className="flex items-center gap-4 text-sm text-gray-600">
+                              <span>Loại: {getQuestionTypeLabel(question.question_type)}</span>
+                              <span>Điểm: {question.points}</span>
+                            </div>
+                            {question.options && question.options.length > 0 && question.options.some(opt => opt.trim()) && (
+                              <div className="mt-2">
+                                <p className="text-sm text-gray-600 mb-1">Các lựa chọn:</p>
+                                <div className="grid grid-cols-2 gap-2">
+                                  {question.options.filter(opt => opt.trim()).map((option, optIndex) => (
+                                    <div key={optIndex} className={`text-sm p-2 rounded ${
+                                      option === question.correct_answer 
+                                        ? 'bg-green-100 text-green-800 border border-green-300' 
+                                        : 'bg-gray-100 text-gray-700'
+                                    }`}>
+                                      {String.fromCharCode(65 + optIndex)}: {option}
+                                    </div>
+                                  ))}
+                                </div>
+                              </div>
+                            )}
+                          </div>
+                          <div className="flex gap-2">
+                            <button
+                              onClick={() => handleEditQuestion(index)}
+                              className="text-blue-600 hover:text-blue-800"
+                              title="Chỉnh sửa câu hỏi"
+                            >
+                              <Edit className="w-4 h-4" />
+                            </button>
+                            <button
+                              onClick={() => setQuestions(prev => prev.filter((_, i) => i !== index))}
+                              className="text-red-600 hover:text-red-800"
+                              title="Xóa câu hỏi"
+                            >
+                              <Trash2 className="w-4 h-4" />
+                            </button>
+                          </div>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {/* Add Question Button */}
+              <div className="flex justify-center">
+                <button
+                  onClick={() => {
+                    setCurrentQuestion({
+                      question_text: '',
+                      question_type: '',
+                      points: '',
+                      options: ['', '', '', ''],
+                      correct_answer: ''
+                    });
+                    setEditingQuestionIndex(null);
+                    setEditingExistingQuestionIndex(null);
+                    setShowAddQuestion(true);
+                  }}
+                  className="flex items-center gap-2 px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700"
+                >
+                  <Plus className="w-4 h-4" />
+                  Thêm câu hỏi mới
+                </button>
+              </div>
             </div>
 
             <div className="p-6 border-t border-gray-200 flex justify-end gap-4">
@@ -1313,6 +1615,8 @@ export default function ExerciseManagement() {
                 onClick={() => {
                   setShowEditModal(false);
                   setEditingExercise(null);
+                  setExistingQuestions([]);
+                  setQuestions([]);
                 }}
                 className="px-4 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50"
               >
@@ -1404,55 +1708,31 @@ export default function ExerciseManagement() {
 
                   <div className="text-center">
                     <button
-                      onClick={handleParseFile}
-                      disabled={uploadLoading}
-                      className="px-6 py-3 bg-purple-600 text-white rounded-lg hover:bg-purple-700 disabled:opacity-50 flex items-center gap-2 mx-auto"
+                      onClick={handleUploadFileToStorage}
+                      disabled={fileUploadLoading || !uploadedFile}
+                      className="px-6 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 flex items-center gap-2 mx-auto"
                     >
-                      {uploadLoading && <RefreshCw className="w-4 h-4 animate-spin" />}
-                      {uploadLoading ? 'Đang phân tích...' : 'Phân tích nội dung'}
+                      {fileUploadLoading && <RefreshCw className="w-4 h-4 animate-spin" />}
+                      {fileUploadLoading ? 'Đang upload...' : 'Upload file lên Supabase'}
                     </button>
-                  </div>
-                </div>
-              )}
-
-              {parsedContent && (
-                <div className="space-y-4">
-                  <div className="bg-green-50 border border-green-200 rounded-lg p-4">
-                    <h3 className="font-semibold text-green-800 mb-2">
-                      Nội dung đã phân tích thành công!
-                    </h3>
-                    <div className="space-y-2 text-sm text-green-700">
-                      <p><strong>Tiêu đề:</strong> {parsedContent.title || 'Không xác định'}</p>
-                      <p><strong>Số câu hỏi:</strong> {parsedContent.questions?.length || 0}</p>
-                      <p><strong>Loại bài tập:</strong> {parsedContent.type || 'Trắc nghiệm'}</p>
-                    </div>
-                  </div>
-
-                  {parsedContent.questions?.length > 0 && (
-                    <div className="max-h-60 overflow-y-auto border border-gray-200 rounded-lg p-4">
-                      <h4 className="font-medium text-gray-900 mb-3">Preview câu hỏi:</h4>
-                      <div className="space-y-3">
-                        {parsedContent.questions.slice(0, 3).map((q: ParsedQuestion, index: number) => (
-                          <div key={index} className="bg-gray-50 p-3 rounded-lg">
-                            <p className="font-medium text-sm">Câu {index + 1}: {q.question}</p>
-                            {q.options && (
-                              <div className="mt-2 text-xs text-gray-600">
-                                <p>Lựa chọn: {q.options.join(', ')}</p>
-                                <p className="text-green-600">Đáp án: {q.options[q.correctAnswer]}</p>
-                              </div>
-                            )}
-                          </div>
-                        ))}
-                        {parsedContent.questions.length > 3 && (
-                          <p className="text-sm text-gray-500 text-center">
-                            ... và {parsedContent.questions.length - 3} câu hỏi khác
-                          </p>
-                        )}
+                    {uploadedFileUrl && (
+                      <div className="mt-3 flex items-center justify-center gap-3">
+                        <div className="text-green-700 text-sm">Đã Upload file thành công</div>
+                        <a
+                          href={uploadedFileUrl}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="inline-flex items-center gap-1.5 px-3 py-1.5 text-sm border border-green-600 text-green-700 rounded hover:bg-green-50"
+                        >
+                          Xem file
+                        </a>
                       </div>
-                    </div>
-                  )}
+                    )}
+                  </div>
                 </div>
               )}
+
+              {/* Parse preview removed: we now upload directly */}
             </div>
 
             <div className="p-6 border-t border-gray-200 flex justify-end gap-4">
@@ -1480,6 +1760,172 @@ export default function ExerciseManagement() {
           </div>
         </div>
       )}
+
+      {/* Detail Modal */}
+      {showDetailModal && selectedExercise && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
+          <div className="bg-white rounded-xl max-w-4xl w-full max-h-[90vh] overflow-y-auto">
+            <div className="p-6">
+              {/* Header */}
+              <div className="flex justify-between items-start mb-6">
+                <div>
+                  <div className="flex items-center gap-3 mb-2">
+                    <div className="p-2 bg-purple-100 rounded-lg">
+                      <BookOpen className="w-6 h-6 text-purple-600" />
+                    </div>
+                    <div>
+                      <h3 className="text-2xl font-bold text-gray-900">{selectedExercise.title}</h3>
+                      <div className="flex items-center gap-2 mt-1">
+                        <span className="text-sm font-medium text-purple-600">
+                          {getTypeLabel(selectedExercise.exercise_type)}
+                        </span>
+                        <span className={`px-2 py-1 rounded-full text-xs font-medium ${getDifficultyColor(selectedExercise.difficulty_level)}`}>
+                          {getDifficultyLabel(selectedExercise.difficulty_level)}
+                        </span>
+                        <span className={`px-2 py-1 rounded-full text-xs font-medium ${
+                          selectedExercise.is_active ? 'bg-green-100 text-green-800' : 'bg-gray-100 text-gray-800'
+                        }`}>
+                          {selectedExercise.is_active ? 'Đang hoạt động' : 'Tạm dừng'}
+                        </span>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+                <button
+                  onClick={() => setShowDetailModal(false)}
+                  className="text-gray-400 hover:text-gray-600 p-2"
+                >
+                  <XCircle className="w-6 h-6" />
+                </button>
+              </div>
+
+              {/* Exercise Info */}
+              <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
+                <div className="space-y-4">
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">Mô tả</label>
+                    <div className="p-3 bg-gray-50 rounded-lg">
+                      <p className="text-gray-900">{selectedExercise.description || 'Không có mô tả'}</p>
+                    </div>
+                  </div>
+                  
+                  <div className="grid grid-cols-2 gap-4">
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">Điểm tối đa</label>
+                      <div className="flex items-center gap-2 p-3 bg-gray-50 rounded-lg">
+                        <Target className="w-4 h-4 text-orange-600" />
+                        <span className="font-medium">{selectedExercise.max_score}</span>
+                      </div>
+                    </div>
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">Thời gian (phút)</label>
+                      <div className="flex items-center gap-2 p-3 bg-gray-50 rounded-lg">
+                        <Clock className="w-4 h-4 text-blue-600" />
+                        <span className="font-medium">{selectedExercise.time_limit_minutes || 'Không giới hạn'}</span>
+                      </div>
+                    </div>
+                  </div>
+
+                  {selectedExercise.source_file_url && (
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">File gốc</label>
+                      <div className="p-3 bg-blue-50 rounded-lg">
+                        <a 
+                          href={selectedExercise.source_file_url} 
+                          target="_blank" 
+                          rel="noopener noreferrer"
+                          className="flex items-center gap-2 text-blue-600 hover:text-blue-800"
+                        >
+                          <FileText className="w-4 h-4" />
+                          <span>Xem file đính kèm</span>
+                        </a>
+                      </div>
+                    </div>
+                  )}
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-3">
+                    Câu hỏi ({selectedExercise.questions?.length || 0})
+                  </label>
+                  
+                  {selectedExercise.questions && selectedExercise.questions.length > 0 ? (
+                    <div className="space-y-3 max-h-96 overflow-y-auto">
+                      {selectedExercise.questions.map((question, index) => (
+                        <div key={question.id} className="p-4 bg-gray-50 rounded-lg">
+                          <div className="flex justify-between items-start mb-2">
+                            <span className="text-sm font-medium text-gray-600">Câu {index + 1}</span>
+                            <div className="flex items-center gap-2 text-xs text-gray-500">
+                              <span>{getQuestionTypeLabel(question.question_type)}</span>
+                              <span>•</span>
+                              <span>{question.points} điểm</span>
+                            </div>
+                          </div>
+                          
+                          <p className="text-gray-900 mb-3">{question.question_text}</p>
+                          
+                          {question.options && question.options.length > 0 && (
+                            <div className="space-y-1">
+                              {question.options.map((option, optIndex) => (
+                                <div 
+                                  key={optIndex}
+                                  className={`text-sm p-2 rounded ${
+                                    option === question.correct_answer 
+                                      ? 'bg-green-100 text-green-800 font-medium' 
+                                      : 'bg-white text-gray-700'
+                                  }`}
+                                >
+                                  {String.fromCharCode(65 + optIndex)}. {option}
+                                  {option === question.correct_answer && (
+                                    <span className="ml-2 text-green-600">✓</span>
+                                  )}
+                                </div>
+                              ))}
+                            </div>
+                          )}
+                          
+                          {question.explanation && (
+                            <div className="mt-3 p-3 bg-blue-50 rounded-lg">
+                              <p className="text-sm text-blue-800">
+                                <strong>Giải thích:</strong> {question.explanation}
+                              </p>
+                            </div>
+                          )}
+                        </div>
+                      ))}
+                    </div>
+                  ) : (
+                    <div className="p-8 text-center text-gray-500">
+                      <BookOpen className="w-12 h-12 mx-auto mb-3 text-gray-300" />
+                      <p>Chưa có câu hỏi nào</p>
+                    </div>
+                  )}
+                </div>
+              </div>
+
+              {/* Footer */}
+              <div className="flex justify-end gap-3 pt-4 border-t">
+                <button
+                  onClick={() => setShowDetailModal(false)}
+                  className="px-6 py-2 text-gray-600 hover:text-gray-800 transition-colors"
+                >
+                  Đóng
+                </button>
+                <button
+                  onClick={() => {
+                    setShowDetailModal(false);
+                    handleEditExercise(selectedExercise);
+                  }}
+                  className="px-6 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 transition-colors"
+                >
+                  Chỉnh sửa
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
     </div>
   );
 }

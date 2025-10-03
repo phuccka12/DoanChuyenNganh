@@ -13,10 +13,13 @@ export async function GET(
     const { id } = params;
     const supabase = createClient(supabaseUrl, supabaseKey);
     
-    // Get exercise first
+    // Get exercise with questions
     const { data: exercise, error } = await supabase
       .from('exercises')
-      .select('*')
+      .select(`
+        *,
+        questions (*)
+      `)
       .eq('id', id)
       .single();
     
@@ -28,19 +31,7 @@ export async function GET(
       );
     }
 
-    // Get questions separately
-    const { data: questions } = await supabase
-      .from('questions')
-      .select('*')
-      .eq('exercise_id', id);
-    
-    // Combine exercise with questions
-    const exerciseWithQuestions = {
-      ...exercise,
-      questions: questions || []
-    };
-
-    return NextResponse.json({ exercise: exerciseWithQuestions });
+    return NextResponse.json({ exercise });
   } catch (error) {
     console.error('Error fetching exercise:', error);
     return NextResponse.json(
@@ -85,94 +76,32 @@ export async function PUT(
       );
     }
 
-    // Handle questions updates
-    const { existingQuestions, newQuestions } = body;
-    
-    console.log('Received existingQuestions:', existingQuestions);
-    console.log('Received newQuestions:', newQuestions);
-    
-    // First, delete all existing questions
-    const { error: deleteError } = await supabase
-      .from('questions')
-      .delete()
-      .eq('exercise_id', id);
-    
-    if (deleteError) {
-      console.error('Error deleting questions:', deleteError);
-    }
-    
-    const allQuestions = [];
-    
-    // Process existing questions (modified)
-    if (existingQuestions && existingQuestions.length > 0) {
-      const processedExistingQuestions = existingQuestions.map((q: {
-        id?: string;
-        question_text: string;
-        question_type: string;
-        points: string | number;
-        options?: string[];
-        correct_answer: string;
-        explanation?: string;
-      }) => ({
-        exercise_id: id,
-        question_text: q.question_text,
-        question_type: q.question_type,
-        points: typeof q.points === 'string' ? parseInt(q.points) || 10 : q.points,
-        options: q.options,
-        correct_answer: q.correct_answer,
-        explanation: q.explanation || null
-      }));
-      allQuestions.push(...processedExistingQuestions);
-    }
-    
-    // Process new questions
-    if (newQuestions && newQuestions.length > 0) {
-      const processedNewQuestions = newQuestions.map((q: {
-        question_text: string;
-        question_type: string;
-        points: string | number;
-        options?: string[];
-        correct_answer: string;
-        explanation?: string;
-      }) => ({
-        exercise_id: id,
-        question_text: q.question_text,
-        question_type: q.question_type,
-        points: typeof q.points === 'string' ? parseInt(q.points) || 10 : q.points,
-        options: q.options,
-        correct_answer: q.correct_answer,
-        explanation: q.explanation || null
-      }));
-      allQuestions.push(...processedNewQuestions);
-    }
-    
-    // Insert all questions
-    if (allQuestions.length > 0) {
-      const { error: insertError } = await supabase
+    // Update questions if provided
+    if (body.questions && body.questions.length > 0) {
+      // Delete existing questions
+      await supabase
         .from('questions')
-        .insert(allQuestions);
-      
-      if (insertError) {
-        console.error('Error inserting questions:', insertError);
-        return NextResponse.json(
-          { error: 'Failed to update questions' },
-          { status: 500 }
-        );
-      }
-    }
+        .delete()
+        .eq('exercise_id', id);
 
-    // Fetch updated exercise with questions for response
-    const { data: updatedExercise } = await supabase
-      .from('exercises')
-      .select(`
-        *,
-        questions (*)
-      `)
-      .eq('id', id)
-      .single();
+      // Insert new questions
+      const questions = body.questions.map((q: { question_text: string; question_type: string; points: string; options: string[]; correct_answer: string; explanation?: string }) => ({
+        exercise_id: id,
+        question_text: q.question_text,
+        question_type: q.question_type,
+        points: parseInt(q.points) || 10,
+        options: q.options,
+        correct_answer: q.correct_answer,
+        explanation: q.explanation || null
+      }));
+
+      await supabase
+        .from('questions')
+        .insert(questions);
+    }
 
     return NextResponse.json({ 
-      exercise: updatedExercise || exercise,
+      exercise,
       message: 'Exercise updated successfully' 
     });
   } catch (error) {
